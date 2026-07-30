@@ -21,6 +21,11 @@ services:
       ARGUS_APP_VERSION: ${ARGUS_APP_VERSION:-0.1.0}
       ARGUS_LOG_LEVEL: ${ARGUS_LOG_LEVEL:-INFO}
       ARGUS_CORS_ORIGINS: ${ARGUS_CORS_ORIGINS:-http://localhost:8080}
+      ARGUS_DEBUG_INFERENCE_ENABLED: ${ARGUS_DEBUG_INFERENCE_ENABLED:-false}
+      ARGUS_MODEL_PROVIDER: ${ARGUS_MODEL_PROVIDER:-llama_cpp}
+      ARGUS_MODEL_NAME: ${ARGUS_MODEL_NAME:-local-model-not-downloaded}
+      ARGUS_MODEL_ENDPOINT: ${ARGUS_MODEL_ENDPOINT:-http://inference-cpu:8080/v1}
+      ARGUS_MODEL_CONTEXT_CEILING: ${ARGUS_MODEL_CONTEXT_CEILING:-32768}
     depends_on:
       postgres:
         condition: service_healthy
