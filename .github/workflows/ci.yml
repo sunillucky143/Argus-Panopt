@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "23 8 * * 2"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend quality and unit tests
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.9.13"
+          enable-cache: true
+      - run: uv sync --frozen --all-groups
+      - run: uv run black --check .
+      - run: uv run ruff check .
+      - run: uv run mypy app tests
+      - run: uv run pytest
+
+  frontend:
+    name: Frontend quality and unit tests
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.14.0"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run check
+
+  security:
+    name: Security policy and scans
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.9.13"
+      - run: python scripts/check_no_external_ai.py .
+      - working-directory: backend
+        run: |
+          uv sync --frozen --all-groups
+          uv run bandit -c pyproject.toml -r app
+          uv run pip-audit
+      - working-directory: frontend
+        run: npm audit --audit-level=critical
+      - name: Semgrep
+        run: uvx semgrep scan --config p/python --error backend/app
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: aquasecurity/trivy-action@0.33.1
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+
+  compose:
+    name: Compose build and smoke test
+    runs-on: ubuntu-24.04
+    env:
+      POSTGRES_PASSWORD: ci-postgres-not-production
+      REDIS_PASSWORD: ci-redis-not-production
+    steps:
+      - uses: actions/checkout@v4
+      - run: cp deploy/.env.example .env
+      - run: sh deploy/init-secrets.sh
+      - run: docker compose --profile cpu config --quiet
+      - run: docker compose --profile cpu build
+      - run: docker compose --profile cpu up -d --wait
+      - run: curl --fail --show-error --retry 5 http://localhost:8080/api/health/ready
+      - run: sh scripts/check_processing_egress.sh
+      - if: always()
+        run: docker compose --profile cpu down --volumes
