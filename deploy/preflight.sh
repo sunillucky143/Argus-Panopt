@@ -1,0 +1,94 @@
+#!/usr/bin/env sh
+set -eu
+
+profile="${1:-cpu}"
+required_disk_kb=10485760
+web_port="${ARGUS_WEB_PORT:-8080}"
+environment="${ARGUS_ENVIRONMENT:-}"
+
+fail() {
+  printf 'ERROR: %s\n' "$1" >&2
+  exit 1
+}
+
+info() {
+  printf 'OK: %s\n' "$1"
+}
+
+case "$profile" in
+  cpu|gpu) ;;
+  *) fail "profile must be 'cpu' or 'gpu'" ;;
+esac
+
+command -v docker >/dev/null 2>&1 || fail "Docker is not installed"
+docker compose version >/dev/null 2>&1 || fail "Docker Compose v2 is unavailable"
+docker info >/dev/null 2>&1 || fail "Docker daemon is not reachable"
+info "Docker and Compose are available"
+
+available_disk_kb="$(df -Pk . | awk 'NR == 2 {print $4}')"
+case "$available_disk_kb" in
+  ''|*[!0-9]*) fail "could not determine free disk space" ;;
+esac
+[ "$available_disk_kb" -ge "$required_disk_kb" ] || fail "at least 10 GB free disk is required"
+info "at least 10 GB free disk is available"
+
+if [ -z "${ARGUS_WEB_PORT:-}" ] && [ -f .env ]; then
+  configured_web_port="$(sed -n 's/^ARGUS_WEB_PORT=//p' .env | tail -n 1)"
+  [ -z "$configured_web_port" ] || web_port="$configured_web_port"
+fi
+if [ -z "$environment" ] && [ -f .env ]; then
+  environment="$(sed -n 's/^ARGUS_ENVIRONMENT=//p' .env | tail -n 1)"
+fi
+case "$web_port" in
+  ''|*[!0-9]*) fail "ARGUS_WEB_PORT must be numeric" ;;
+esac
+[ "$web_port" -ge 1 ] && [ "$web_port" -le 65535 ] \
+  || fail "ARGUS_WEB_PORT must be between 1 and 65535"
+
+if docker ps --format '{{.Ports}}' | grep -Eq "[:.]${web_port}->"; then
+  fail "port ${web_port} is already published by a Docker container"
+fi
+if command -v python3 >/dev/null 2>&1 && python3 --version >/dev/null 2>&1; then
+  python3 - "$web_port" <<'PY' || fail "host port ${web_port} is already in use"
+import socket
+import sys
+
+with socket.socket() as sock:
+    sock.bind(("0.0.0.0", int(sys.argv[1])))
+PY
+elif command -v nc >/dev/null 2>&1; then
+  ! nc -z 127.0.0.1 "$web_port" || fail "host port ${web_port} is already in use"
+elif command -v powershell.exe >/dev/null 2>&1; then
+  powershell.exe -NoProfile -NonInteractive -Command \
+    "if (Get-NetTCPConnection -State Listen -LocalPort ${web_port} -ErrorAction SilentlyContinue) { exit 1 }" \
+    || fail "host port ${web_port} is already in use"
+else
+  fail "cannot verify host port availability (install python3 or netcat)"
+fi
+info "host port ${web_port} is available"
+
+if [ ! -f .env ]; then
+  fail "missing .env; copy deploy/.env.example to .env and review every value"
+fi
+
+[ -f deploy/secrets/postgres_password.txt ] \
+  || fail "missing PostgreSQL secret; run ./deploy/init-secrets.sh"
+[ -f deploy/secrets/redis_password.txt ] \
+  || fail "missing Redis secret; run ./deploy/init-secrets.sh"
+
+if grep -q 'replace-before-production' .env && [ "${environment:-development}" = "production" ]; then
+  fail "example secrets cannot be used in production"
+fi
+info "environment file is present"
+
+if [ "$profile" = "gpu" ]; then
+  command -v nvidia-smi >/dev/null 2>&1 || fail "nvidia-smi is unavailable"
+  nvidia-smi >/dev/null 2>&1 || fail "NVIDIA driver is not operational"
+  docker info --format '{{json .Runtimes}}' | grep -qi nvidia \
+    || fail "NVIDIA Container Toolkit runtime is unavailable"
+  info "GPU driver and container runtime are available"
+fi
+
+docker compose --profile "$profile" config --quiet \
+  || fail "Compose configuration is invalid"
+info "Argus Panopt ${profile} profile passed preflight"
