@@ -54,7 +54,7 @@ import socket
 import sys
 
 with socket.socket() as sock:
-    sock.bind(("127.0.0.1", int(sys.argv[1])))
+    sock.bind(("0.0.0.0", int(sys.argv[1])))
 PY
 elif command -v nc >/dev/null 2>&1; then
   ! nc -z 127.0.0.1 "$web_port" || fail "host port ${web_port} is already in use"

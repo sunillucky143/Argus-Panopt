@@ -20,7 +20,7 @@ services:
       ARGUS_ENVIRONMENT: ${ARGUS_ENVIRONMENT:-development}
       ARGUS_APP_VERSION: ${ARGUS_APP_VERSION:-0.1.0}
       ARGUS_LOG_LEVEL: ${ARGUS_LOG_LEVEL:-INFO}
-      ARGUS_CORS_ORIGINS: ${ARGUS_CORS_ORIGINS:-
+      ARGUS_CORS_ORIGINS: ${ARGUS_CORS_ORIGINS:-http://localhost:8080}
     depends_on:
       postgres:
         condition: service_healthy
@@ -30,12 +30,6 @@ services:
       - processing
     tmpfs:
       - /tmp:size=64m,mode=1770,uid=10001,gid=10001
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('', timeout=2)"]
-      interval: 15s
-      timeout: 3s
-      retries: 3
-      start_period: 10s
     cpus: ${ARGUS_API_CPUS:-1.0}
     mem_limit: ${ARGUS_API_MEMORY:-768m}
     pids_limit: 128
