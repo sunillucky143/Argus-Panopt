@@ -1,0 +1,4 @@
+name: argus-panopt
+
+include:
+  - path: deploy/docker-compose.yml
