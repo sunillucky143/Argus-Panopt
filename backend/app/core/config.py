@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     log_level: str = Field(default="INFO", pattern=r"^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$")
     cors_origins: str = "http://localhost:8080"
+    debug_inference_enabled: bool = False
+    model_provider: str = Field(default="llama_cpp", pattern=r"^(fake|llama_cpp|vllm)$")
+    model_name: str = "local-model-not-downloaded"
+    model_endpoint: str = "http://inference-cpu:8080/v1"
+    model_context_ceiling: int = Field(default=32_768, ge=1024, le=131_072)
 
     @property
     def allowed_origins(self) -> tuple[str, ...]:
