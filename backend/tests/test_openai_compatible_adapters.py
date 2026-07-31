@@ -126,6 +126,37 @@ def test_adapter_rejects_invalid_stream_without_echoing_response() -> None:
     assert "raw-private-model-output" not in str(caught.value)
 
 
+@pytest.mark.parametrize(
+    "event",
+    [
+        pytest.param(b'data: {"choices":[]}\n\n', id="empty-choices"),
+        pytest.param(
+            b'data: {"choices":[{"delta":"raw-private-model-output"}]}\n\n',
+            id="non-object-delta",
+        ),
+    ],
+)
+def test_adapter_rejects_malformed_choice_payloads(event: bytes) -> None:
+    def handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, stream=StubEventStream([event]))
+
+    async def collect() -> None:
+        adapter = LlamaCppAdapter(
+            endpoint="http://inference-cpu:8080/v1",
+            model_name="local-test-model",
+            max_context=4096,
+            transport=httpx.MockTransport(handler),
+        )
+        stream = await adapter.generate(_request())
+        async for _ in stream:
+            pass
+
+    with pytest.raises(ModelProtocolError, match="invalid event stream") as caught:
+        asyncio.run(collect())
+
+    assert "raw-private-model-output" not in str(caught.value)
+
+
 def test_adapter_wraps_http_failures_in_a_generic_error() -> None:
     def handler(_: httpx.Request) -> httpx.Response:
         return httpx.Response(503, text="engine leaked internal details")
