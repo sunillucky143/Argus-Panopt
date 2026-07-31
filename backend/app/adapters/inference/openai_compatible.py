@@ -1,12 +1,15 @@
 """Streaming adapters for deployment-local OpenAI-compatible model servers."""
 
 import json
+import logging
 from collections.abc import AsyncIterator
 from typing import Any
 
 import httpx
 
 from app.domain.inference import GenerationChunk, GenerationRequest, ModelCapabilities
+
+logger = logging.getLogger(__name__)
 
 
 class ModelAdapterError(RuntimeError):
@@ -33,7 +36,13 @@ class OpenAICompatibleChatAdapter:
         timeout_seconds: float = 120.0,
     ) -> None:
         self._endpoint = f"{endpoint.rstrip('/')}/"
-        self._health_endpoint = httpx.URL(endpoint).copy_with(path="/health")
+        endpoint_url = httpx.URL(endpoint)
+        self._health_endpoint = httpx.URL(
+            scheme=endpoint_url.scheme,
+            host=endpoint_url.host,
+            port=endpoint_url.port,
+            path="/health",
+        )
         self._capabilities = capabilities
         self._transport = transport
         self._timeout = httpx.Timeout(timeout_seconds)
@@ -49,7 +58,8 @@ class OpenAICompatibleChatAdapter:
                 follow_redirects=False,
             ) as client:
                 response = await client.get(self._health_endpoint)
-        except httpx.HTTPError:
+        except httpx.HTTPError as error:
+            logger.debug("Local model health probe failed: %s", type(error).__name__)
             return False
         return self._health_response_is_ready(response)
 

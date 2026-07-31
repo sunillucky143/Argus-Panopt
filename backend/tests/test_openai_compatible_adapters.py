@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -116,12 +117,12 @@ def test_local_adapters_probe_root_health_endpoint(
     captured: dict[str, str] = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
-        captured["path"] = request.url.path
+        captured["url"] = str(request.url)
         return response
 
     async def check() -> bool:
         adapter = adapter_type(
-            endpoint="http://inference-engine:8080/v1",
+            endpoint="http://inference-engine:8080/v1?ignored=yes#fragment",
             model_name="local-test-model",
             max_context=4096,
             transport=httpx.MockTransport(handler),
@@ -129,7 +130,7 @@ def test_local_adapters_probe_root_health_endpoint(
         return await adapter.health()
 
     assert asyncio.run(check()) is True
-    assert captured["path"] == "/health"
+    assert captured["url"] == "http://inference-engine:8080/health"
 
 
 def test_llama_cpp_health_requires_loaded_model_status() -> None:
@@ -151,6 +152,7 @@ def test_llama_cpp_health_requires_loaded_model_status() -> None:
 @pytest.mark.parametrize("adapter_type", [LlamaCppAdapter, VllmOpenAIAdapter])
 def test_local_adapter_health_fails_closed_on_transport_error(
     adapter_type: AdapterType,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectError("private endpoint details", request=request)
@@ -164,7 +166,11 @@ def test_local_adapter_health_fails_closed_on_transport_error(
         )
         return await adapter.health()
 
-    assert asyncio.run(check()) is False
+    with caplog.at_level(logging.DEBUG):
+        assert asyncio.run(check()) is False
+
+    assert "ConnectError" in caplog.text
+    assert "private endpoint details" not in caplog.text
 
 
 def test_adapter_rejects_invalid_stream_without_echoing_response() -> None:
