@@ -20,7 +20,7 @@ fi
 
 if docker compose ps --services --status running | grep -qx 'inference-cpu'; then
   if docker compose exec -T inference-cpu curl \
-    --insecure --silent --output /dev/null --connect-timeout 3 --max-time 3 \
+    --silent --output /dev/null --connect-timeout 3 --max-time 3 \
     https://1.1.1.1/; then
     printf 'ERROR: model processing network unexpectedly allowed outbound access\n' >&2
     exit 1
@@ -33,7 +33,7 @@ if docker compose ps --services --status running | grep -qx 'inference-cpu'; the
   fi
 elif [ "$probe_model" = true ]; then
   if docker compose --profile cpu run --rm --no-deps --entrypoint curl inference-cpu \
-    --insecure --silent --output /dev/null --connect-timeout 3 --max-time 3 \
+    --silent --output /dev/null --connect-timeout 3 --max-time 3 \
     https://1.1.1.1/; then
     printf 'ERROR: model processing network unexpectedly allowed outbound access\n' >&2
     exit 1

@@ -112,6 +112,9 @@ jobs:
           ARGUS_MODEL_NAME: argus-smoke-model
         run: docker compose --profile smoke up -d --wait
       - run: curl --fail --show-error --retry 5 http://localhost:8080/api/health/ready
-      - run: sh scripts/check_processing_egress.sh --probe-model-image
+      - name: Verify processing egress isolation
+        env:
+          ARGUS_LLAMA_CPUS: "4.0"
+        run: sh scripts/check_processing_egress.sh --probe-model-image
       - if: always()
         run: docker compose --profile smoke down --volumes
