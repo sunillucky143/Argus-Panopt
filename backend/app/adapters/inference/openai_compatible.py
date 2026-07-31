@@ -118,7 +118,7 @@ class OpenAICompatibleChatAdapter:
                     "Local inference service returned an invalid event stream."
                 )
 
-            content = delta.get("content") if delta else None
+            content = delta.get("content") if (delta and isinstance(delta, dict)) else None
             if content is not None and not isinstance(content, str):
                 raise ModelProtocolError(
                     "Local inference service returned an invalid event stream."
