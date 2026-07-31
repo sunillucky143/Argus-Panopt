@@ -3,6 +3,7 @@ set -eu
 
 profile="${1:-cpu}"
 required_disk_kb=10485760
+required_disk_gb=10
 web_port="${ARGUS_WEB_PORT:-8080}"
 environment="${ARGUS_ENVIRONMENT:-}"
 
@@ -20,6 +21,14 @@ case "$profile" in
   *) fail "profile must be 'cpu' or 'gpu'" ;;
 esac
 
+[ -f compose.yaml ] && [ -f inference/manifests/tier-s-gemma-3-4b-it-q4_k_m.json ] \
+  || fail "run preflight from the repository root"
+
+if [ "$profile" = "cpu" ]; then
+  required_disk_kb=15728640
+  required_disk_gb=15
+fi
+
 command -v docker >/dev/null 2>&1 || fail "Docker is not installed"
 docker compose version >/dev/null 2>&1 || fail "Docker Compose v2 is unavailable"
 docker info >/dev/null 2>&1 || fail "Docker daemon is not reachable"
@@ -29,8 +38,9 @@ available_disk_kb="$(df -Pk . | awk 'NR == 2 {print $4}')"
 case "$available_disk_kb" in
   ''|*[!0-9]*) fail "could not determine free disk space" ;;
 esac
-[ "$available_disk_kb" -ge "$required_disk_kb" ] || fail "at least 10 GB free disk is required"
-info "at least 10 GB free disk is available"
+[ "$available_disk_kb" -ge "$required_disk_kb" ] \
+  || fail "at least ${required_disk_gb} GB free disk is required"
+info "at least ${required_disk_gb} GB free disk is available"
 
 if [ -z "${ARGUS_WEB_PORT:-}" ] && [ -f .env ]; then
   configured_web_port="$(sed -n 's/^ARGUS_WEB_PORT=//p' .env | tail -n 1)"
@@ -80,6 +90,22 @@ if grep -q 'replace-before-production' .env && [ "${environment:-development}" =
   fail "example secrets cannot be used in production"
 fi
 info "environment file is present"
+
+if [ "$profile" = "cpu" ]; then
+  if command -v python3 >/dev/null 2>&1; then
+    python_command=python3
+  elif command -v python >/dev/null 2>&1; then
+    python_command=python
+  else
+    fail "Python is required to verify the Tier S model artifact"
+  fi
+  "$python_command" -m inference.download_model \
+    --manifest inference/manifests/tier-s-gemma-3-4b-it-q4_k_m.json \
+    --output-dir models \
+    --verify-only \
+    || fail "Tier S model artifact is missing or failed checksum verification"
+  info "Tier S model artifact passed checksum verification"
+fi
 
 if [ "$profile" = "gpu" ]; then
   command -v nvidia-smi >/dev/null 2>&1 || fail "nvidia-smi is unavailable"

@@ -103,9 +103,18 @@ jobs:
       - run: cp deploy/.env.example .env
       - run: sh deploy/init-secrets.sh
       - run: docker compose --profile cpu config --quiet
-      - run: docker compose --profile cpu build
-      - run: docker compose --profile cpu up -d --wait
+      - run: python scripts/check_model_runtime_policy.py
+      - run: docker compose --profile cpu pull inference-cpu
+      - run: docker compose --profile smoke build
+      - name: Start deterministic smoke stack
+        env:
+          ARGUS_MODEL_PROVIDER: fake
+          ARGUS_MODEL_NAME: argus-smoke-model
+        run: docker compose --profile smoke up -d --wait
       - run: curl --fail --show-error --retry 5 http://localhost:8080/api/health/ready
-      - run: sh scripts/check_processing_egress.sh
+      - name: Verify processing egress isolation
+        env:
+          ARGUS_LLAMA_CPUS: "4.0"
+        run: sh scripts/check_processing_egress.sh --probe-model-image
       - if: always()
-        run: docker compose --profile cpu down --volumes
+        run: docker compose --profile smoke down --volumes
