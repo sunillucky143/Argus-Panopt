@@ -50,10 +50,14 @@ class Settings(BaseSettings):
         try:
             address = ip_address(hostname)
         except ValueError:
-            is_internal_name = hostname == "localhost" or re.fullmatch(
-                r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?",
-                hostname,
-                flags=re.IGNORECASE,
+            is_internal_name = hostname == "localhost" or (
+                re.fullmatch(
+                    r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?",
+                    hostname,
+                    flags=re.IGNORECASE,
+                )
+                and not hostname.startswith("-")
+                and not hostname.endswith("-")
             )
             if not is_internal_name:
                 raise ValueError("model endpoint hostname must be local or private") from None
