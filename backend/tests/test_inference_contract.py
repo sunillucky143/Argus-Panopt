@@ -41,6 +41,11 @@ def test_fake_adapter_reports_capabilities() -> None:
     assert capabilities.vision is False
 
 
+def test_fake_adapter_reports_configured_health() -> None:
+    assert asyncio.run(FakeModelAdapter(ready=True).health()) is True
+    assert asyncio.run(FakeModelAdapter(ready=False).health()) is False
+
+
 def test_registry_reuses_configured_adapter() -> None:
     registry = create_default_registry()
     settings = Settings(

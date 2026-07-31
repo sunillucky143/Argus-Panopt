@@ -102,6 +102,71 @@ def test_local_adapters_translate_and_normalize_streams(
     assert capabilities.vision is vision
 
 
+@pytest.mark.parametrize(
+    ("adapter_type", "response"),
+    [
+        (LlamaCppAdapter, httpx.Response(200, json={"status": "ok"})),
+        (VllmOpenAIAdapter, httpx.Response(200)),
+    ],
+)
+def test_local_adapters_probe_root_health_endpoint(
+    adapter_type: AdapterType,
+    response: httpx.Response,
+) -> None:
+    captured: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["path"] = request.url.path
+        return response
+
+    async def check() -> bool:
+        adapter = adapter_type(
+            endpoint="http://inference-engine:8080/v1",
+            model_name="local-test-model",
+            max_context=4096,
+            transport=httpx.MockTransport(handler),
+        )
+        return await adapter.health()
+
+    assert asyncio.run(check()) is True
+    assert captured["path"] == "/health"
+
+
+def test_llama_cpp_health_requires_loaded_model_status() -> None:
+    def handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"status": "loading"})
+
+    async def check() -> bool:
+        adapter = LlamaCppAdapter(
+            endpoint="http://inference-cpu:8080/v1",
+            model_name="local-test-model",
+            max_context=4096,
+            transport=httpx.MockTransport(handler),
+        )
+        return await adapter.health()
+
+    assert asyncio.run(check()) is False
+
+
+@pytest.mark.parametrize("adapter_type", [LlamaCppAdapter, VllmOpenAIAdapter])
+def test_local_adapter_health_fails_closed_on_transport_error(
+    adapter_type: AdapterType,
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("private endpoint details", request=request)
+
+    async def check() -> bool:
+        adapter = adapter_type(
+            endpoint="http://inference-engine:8080/v1",
+            model_name="local-test-model",
+            max_context=4096,
+            transport=httpx.MockTransport(handler),
+        )
+        return await adapter.health()
+
+    assert asyncio.run(check()) is False
+
+
 def test_adapter_rejects_invalid_stream_without_echoing_response() -> None:
     def handler(_: httpx.Request) -> httpx.Response:
         return httpx.Response(

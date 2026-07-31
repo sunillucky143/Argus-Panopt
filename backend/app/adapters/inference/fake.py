@@ -14,10 +14,17 @@ class FakeModelAdapter:
         model_name: str = "argus-fake-model",
         max_context: int = 32_768,
         response: str = "Local inference adapter is ready.",
+        ready: bool = True,
     ) -> None:
         self._model_name = model_name
         self._max_context = max_context
         self._response = response
+        self._ready = ready
+
+    async def health(self) -> bool:
+        """Return deterministic readiness for health and integration tests."""
+
+        return self._ready
 
     async def generate(self, request: GenerationRequest) -> AsyncIterator[GenerationChunk]:
         """Return a fresh asynchronous stream for each request."""
