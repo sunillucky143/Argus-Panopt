@@ -26,6 +26,9 @@ services:
       ARGUS_MODEL_NAME: ${ARGUS_MODEL_NAME:-gemma-3-4b-it}
       ARGUS_MODEL_ENDPOINT: ${ARGUS_MODEL_ENDPOINT:-http://inference-cpu:8080/v1}
       ARGUS_MODEL_CONTEXT_CEILING: ${ARGUS_MODEL_CONTEXT_CEILING:-32768}
+      ARGUS_EMBEDDING_ENDPOINT: ${ARGUS_EMBEDDING_ENDPOINT:-http://embedding-service:8081}
+      ARGUS_EMBEDDING_MODEL: ${ARGUS_EMBEDDING_MODEL:-bge-m3}
+      ARGUS_RERANKER_MODEL: ${ARGUS_RERANKER_MODEL:-bge-reranker-v2-m3}
     depends_on:
       postgres:
         condition: service_healthy
