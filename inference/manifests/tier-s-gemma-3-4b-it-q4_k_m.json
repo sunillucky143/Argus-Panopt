@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "model_id": "gemma-3-4b-it",
+  "tier": "S",
+  "engine": "llama.cpp",
+  "repository": "ggml-org/gemma-3-4b-it-GGUF",
+  "revision": "d0976223747697cb51e056d85c532013931fe52e",
+  "filename": "gemma-3-4b-it-Q4_K_M.gguf",
+  "quantization": "Q4_K_M",
+  "license": "gemma",
+  "license_url": "https://ai.google.dev/gemma/terms",
+  "source_url": "https://huggingface.co/ggml-org/gemma-3-4b-it-GGUF/resolve/d0976223747697cb51e056d85c532013931fe52e/gemma-3-4b-it-Q4_K_M.gguf?download=true",
+  "size_bytes": 2489757856,
+  "sha256": "882e8d2db44dc554fb0ea5077cb7e4bc49e7342a1f0da57901c0802ea21a0863"
+}

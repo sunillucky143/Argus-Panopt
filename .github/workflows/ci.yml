@@ -16,6 +16,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  model-supply-chain:
+    name: Model manifest and provisioner tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: python -m compileall -q inference
+      - run: python -m unittest discover -s inference/tests -v
+
   backend:
     name: Backend quality and unit tests
     runs-on: ubuntu-24.04

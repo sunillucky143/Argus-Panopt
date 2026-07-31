@@ -28,6 +28,7 @@ operator administration plane. Only the reverse proxy is externally reachable.
 | Parser or model container escape | Elevation | Non-root, dropped capabilities, no-new-privileges, read-only rootfs, pids and resource limits; parser seccomp in Phase 2 | Compose policy and container inspection tests |
 | Oversized workload exhausts services | Denial of service | Upload/context ceilings, rate limits, queue backpressure, per-container resource ceilings, request timeout | Property, load, and soak tests |
 | Compromised dependency or image | Tampering / elevation | Lockfiles, Dependabot, audit/SAST/secret/image scans, SBOM releases, reviewed upgrades | Required CI security job |
+| Replaced or corrupted model weights | Tampering | Immutable upstream revision, exact size and SHA-256 manifest, restricted HTTPS source/redirects, atomic verified install, read-only runtime mount | Offline provisioner tests and pre-deployment verification |
 | Privileged insider reads content | Information disclosure | Least-privilege RBAC, content access audit, encrypted volumes, trace masking/deletion, operator key custody | Access review and audit procedures |
 
 ## Baseline controls present in Phase 0
@@ -45,6 +46,10 @@ operator administration plane. Only the reverse proxy is externally reachable.
 - Model adapter configuration accepts only loopback, private-address, or
   single-label deployment endpoints, blocking explicit public model hosts; the
   internal processing network remains the egress enforcement boundary.
+- Model weights are acquired only as an explicit operator provisioning action.
+  Version-controlled manifests pin the immutable source revision, byte size,
+  SHA-256 digest, and license; verified artifacts are atomically installed
+  before being mounted read-only into an isolated runtime service.
 - INFO logging of document text and prompts is prohibited by policy and review.
 
 ## Required design rules for future phases
