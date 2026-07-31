@@ -154,7 +154,7 @@ class OpenAICompatibleChatAdapter:
         if not isinstance(choices, list):
             raise ModelProtocolError("Local inference service returned an invalid event stream.")
         if not choices:
-            return {}
+            raise ModelProtocolError("Local inference service returned an invalid event stream.")
 
         choice = choices[0]
         if not isinstance(choice, dict):
