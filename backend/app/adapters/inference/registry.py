@@ -3,6 +3,7 @@
 from collections.abc import Callable
 
 from app.adapters.inference.fake import FakeModelAdapter
+from app.adapters.inference.openai_compatible import LlamaCppAdapter, VllmOpenAIAdapter
 from app.core.config import Settings
 from app.ports.inference import ChatModelPort
 
@@ -47,7 +48,7 @@ class ModelAdapterRegistry:
 
 
 def create_default_registry() -> ModelAdapterRegistry:
-    """Create the registry; real local-engine factories arrive in the next work item."""
+    """Create the registry for deterministic and deployment-local engines."""
 
     registry = ModelAdapterRegistry()
     registry.register(
@@ -57,4 +58,21 @@ def create_default_registry() -> ModelAdapterRegistry:
             max_context=settings.model_context_ceiling,
         ),
     )
+    registry.register(
+        "llama_cpp",
+        lambda settings: LlamaCppAdapter(
+            endpoint=settings.model_endpoint,
+            model_name=settings.model_name,
+            max_context=settings.model_context_ceiling,
+        ),
+    )
+    registry.register(
+        "vllm",
+        lambda settings: VllmOpenAIAdapter(
+            endpoint=settings.model_endpoint,
+            model_name=settings.model_name,
+            max_context=settings.model_context_ceiling,
+        ),
+    )
+
     return registry

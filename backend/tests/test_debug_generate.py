@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from app.adapters.inference.registry import ModelAdapterRegistry
 from app.core.config import Settings
 from app.main import create_app
 
@@ -10,6 +11,7 @@ def _client(
     ceiling: int = 4096,
     provider: str = "fake",
     environment: str = "test",
+    registry: ModelAdapterRegistry | None = None,
 ) -> TestClient:
     return TestClient(
         create_app(
@@ -19,7 +21,8 @@ def _client(
                 model_provider=provider,
                 model_name="test-fake",
                 model_context_ceiling=ceiling,
-            )
+            ),
+            model_registry=registry,
         )
     )
 
@@ -71,7 +74,7 @@ def test_debug_generate_rejects_empty_messages() -> None:
 
 
 def test_debug_generate_returns_generic_error_for_unavailable_local_adapter() -> None:
-    response = _client(provider="llama_cpp").post(
+    response = _client(provider="llama_cpp", registry=ModelAdapterRegistry()).post(
         "/v1/debug/generate",
         json={"messages": [{"role": "user", "content": "status"}]},
     )

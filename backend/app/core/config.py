@@ -1,8 +1,11 @@
 """Typed environment configuration."""
 
+import re
 from functools import lru_cache
+from ipaddress import ip_address
+from urllib.parse import urlsplit
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -25,6 +28,40 @@ class Settings(BaseSettings):
     model_name: str = "local-model-not-downloaded"
     model_endpoint: str = "http://inference-cpu:8080/v1"
     model_context_ceiling: int = Field(default=32_768, ge=1024, le=131_072)
+
+    @field_validator("model_endpoint")
+    @classmethod
+    def validate_local_model_endpoint(cls, value: str) -> str:
+        """Reject model endpoints that could route prompts outside the deployment."""
+
+        endpoint = urlsplit(value)
+        hostname = endpoint.hostname
+        if (
+            endpoint.scheme not in {"http", "https"}
+            or hostname is None
+            or endpoint.username is not None
+            or endpoint.password is not None
+            or endpoint.query
+            or endpoint.fragment
+            or any(segment in {".", ".."} for segment in endpoint.path.split("/"))
+        ):
+            raise ValueError("model endpoint must be a simple internal HTTP(S) URL")
+
+        try:
+            address = ip_address(hostname)
+        except ValueError:
+            is_internal_name = hostname == "localhost" or re.fullmatch(
+                r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?",
+                hostname,
+                flags=re.IGNORECASE,
+            )
+            if not is_internal_name:
+                raise ValueError("model endpoint hostname must be local or private") from None
+        else:
+            if not (address.is_loopback or address.is_private or address.is_link_local):
+                raise ValueError("model endpoint hostname must be local or private")
+
+        return value.rstrip("/")
 
     @property
     def allowed_origins(self) -> tuple[str, ...]:

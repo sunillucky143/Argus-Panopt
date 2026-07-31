@@ -42,6 +42,9 @@ operator administration plane. Only the reverse proxy is externally reachable.
 - Database/cache credentials enter through Docker secrets.
 - CI blocks known external AI clients and hosts, secrets, critical dependency
   vulnerabilities, and common static-analysis findings.
+- Model adapter configuration accepts only loopback, private-address, or
+  single-label deployment endpoints, blocking explicit public model hosts; the
+  internal processing network remains the egress enforcement boundary.
 - INFO logging of document text and prompts is prohibited by policy and review.
 
 ## Required design rules for future phases
