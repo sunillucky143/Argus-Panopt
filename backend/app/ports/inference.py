@@ -19,6 +19,9 @@ from app.domain.inference import (
 class ChatModelPort(Protocol):
     """Streaming text-generation boundary."""
 
+    async def health(self) -> bool:
+        """Return whether the configured local engine is ready to generate."""
+
     async def generate(self, request: GenerationRequest) -> AsyncIterator[GenerationChunk]:
         """Create a provider-neutral asynchronous result stream."""
 

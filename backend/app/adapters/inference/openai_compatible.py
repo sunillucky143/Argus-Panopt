@@ -1,12 +1,15 @@
 """Streaming adapters for deployment-local OpenAI-compatible model servers."""
 
 import json
+import logging
 from collections.abc import AsyncIterator
 from typing import Any
 
 import httpx
 
 from app.domain.inference import GenerationChunk, GenerationRequest, ModelCapabilities
+
+logger = logging.getLogger(__name__)
 
 
 class ModelAdapterError(RuntimeError):
@@ -33,9 +36,32 @@ class OpenAICompatibleChatAdapter:
         timeout_seconds: float = 120.0,
     ) -> None:
         self._endpoint = f"{endpoint.rstrip('/')}/"
+        endpoint_url = httpx.URL(endpoint)
+        self._health_endpoint = httpx.URL(
+            scheme=endpoint_url.scheme,
+            host=endpoint_url.host,
+            port=endpoint_url.port,
+            path="/health",
+        )
         self._capabilities = capabilities
         self._transport = transport
         self._timeout = httpx.Timeout(timeout_seconds)
+        self._health_timeout = httpx.Timeout(5.0)
+
+    async def health(self) -> bool:
+        """Probe the engine without exposing endpoint or response details."""
+
+        try:
+            async with httpx.AsyncClient(
+                transport=self._transport,
+                timeout=self._health_timeout,
+                follow_redirects=False,
+            ) as client:
+                response = await client.get(self._health_endpoint)
+        except httpx.HTTPError as error:
+            logger.debug("Local model health probe failed: %s", type(error).__name__)
+            return False
+        return self._health_response_is_ready(response)
 
     async def generate(self, request: GenerationRequest) -> AsyncIterator[GenerationChunk]:
         """Create a normalized stream without exposing prompt content in errors."""
@@ -75,6 +101,11 @@ class OpenAICompatibleChatAdapter:
         """Return the configured local engine capabilities."""
 
         return self._capabilities
+
+    def _health_response_is_ready(self, response: httpx.Response) -> bool:
+        """Interpret a status-only health response."""
+
+        return response.status_code == httpx.codes.OK
 
     def _payload(self, request: GenerationRequest) -> dict[str, Any]:
         messages = [
@@ -187,6 +218,17 @@ class LlamaCppAdapter(OpenAICompatibleChatAdapter):
             ),
             transport=transport,
         )
+
+    def _health_response_is_ready(self, response: httpx.Response) -> bool:
+        """Require llama.cpp's documented loaded-model response."""
+
+        if response.status_code != httpx.codes.OK:
+            return False
+        try:
+            payload = response.json()
+        except ValueError:
+            return False
+        return isinstance(payload, dict) and payload.get("status") == "ok"
 
 
 class VllmOpenAIAdapter(OpenAICompatibleChatAdapter):

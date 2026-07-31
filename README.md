@@ -4,9 +4,9 @@ Argus Panopt is a self-hosted, privacy-first document intelligence platform for
 healthcare and other sensitive workloads. All document processing and model
 inference are designed to remain inside the operator's deployment.
 
-This repository currently contains **Phase 0**: a production-oriented monorepo
-shell, typed health API, frontend shell, hardened Compose profiles, CI/security
-gates, and the initial architecture and security documentation.
+This repository contains the Phase 0 production foundation and active **Phase 1**
+inference work: provider-neutral model ports, local streaming adapters, model-aware
+readiness, hardened Compose profiles, and CI/security gates.
 
 ## Prerequisites
 
@@ -40,6 +40,9 @@ gates, and the initial architecture and security documentation.
    - App: <http://localhost:8080>
    - API docs: <http://localhost:8080/api/docs>
    - API readiness: <http://localhost:8080/api/health/ready>
+
+The current Compose default uses the deterministic smoke adapter. A later Phase 1
+work item switches the CPU profile to llama.cpp after verified weights are installed.
 
 Stop the stack with `docker compose --profile cpu down`.
 
