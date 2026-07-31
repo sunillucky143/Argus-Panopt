@@ -16,6 +16,7 @@ def test_origins_are_normalized() -> None:
         "http://inference-cpu:8080/v1",
         "http://localhost:8080/v1",
         "http://10.20.30.40:8080/v1",
+        f"http://{'a' * 63}:8080/v1",
     ],
 )
 def test_local_model_endpoints_are_accepted(endpoint: str) -> None:
@@ -30,6 +31,7 @@ def test_local_model_endpoints_are_accepted(endpoint: str) -> None:
         "http://8.8.8.8/v1",
         "ftp://inference-cpu/v1",
         "http://user:secret@inference-cpu/v1",
+        f"http://{'a' * 64}:8080/v1",
     ],
 )
 def test_non_local_model_endpoints_are_rejected(endpoint: str) -> None:
