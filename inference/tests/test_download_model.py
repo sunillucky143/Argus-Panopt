@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import stat
 import tempfile
 import unittest
 from io import BytesIO
@@ -17,6 +18,7 @@ from inference.download_model import (
     _validate_redirect_url,
     download_model,
     load_manifest,
+    main,
     verify_artifact,
 )
 
@@ -161,6 +163,8 @@ class DownloadTests(unittest.TestCase):
             self.assertEqual(installed.read_bytes(), _ARTIFACT)
             self.assertTrue(verify_artifact(installed, self.manifest))
             self.assertEqual(list(output.glob("*.part")), [])
+            if os.name != "nt":
+                self.assertEqual(stat.S_IMODE(installed.stat().st_mode), 0o644)
 
     def test_redirect_policy_allows_only_approved_https_artifact_hosts(self) -> None:
         _validate_redirect_url(
@@ -279,6 +283,43 @@ class DownloadTests(unittest.TestCase):
                     output,
                     opener=self._opener(_ARTIFACT),
                 )
+
+    def test_verify_only_cli_accepts_valid_installed_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            manifest_path = _write_manifest(root, _manifest_data())
+            output = root / "models"
+            output.mkdir()
+            (output / self.manifest.filename).write_bytes(_ARTIFACT)
+
+            result = main(
+                [
+                    "--manifest",
+                    str(manifest_path),
+                    "--output-dir",
+                    str(output),
+                    "--verify-only",
+                ]
+            )
+
+            self.assertEqual(result, 0)
+
+    def test_verify_only_cli_rejects_invalid_installed_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            manifest_path = _write_manifest(root, _manifest_data())
+
+            result = main(
+                [
+                    "--manifest",
+                    str(manifest_path),
+                    "--output-dir",
+                    str(root / "models"),
+                    "--verify-only",
+                ]
+            )
+
+            self.assertEqual(result, 1)
 
 
 if __name__ == "__main__":

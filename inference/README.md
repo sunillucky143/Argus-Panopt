@@ -38,6 +38,25 @@ When updating a model, add a new manifest after separately confirming the
 immutable upstream revision, exact byte size, license, and SHA-256. Do not edit
 an existing manifest in place for a different artifact.
 
+## llama.cpp CPU runtime
+
+The Compose `cpu` profile starts the official llama.cpp server build `b9445`
+from a pinned multi-architecture image digest. The service:
+
+- runs as UID/GID 10001 with all capabilities dropped, no-new-privileges, a
+  read-only root filesystem, PID/CPU/RAM ceilings, and a bounded tmpfs;
+- mounts the host `models/` directory read-only and starts only from the exact
+  pinned filename after preflight checksum verification;
+- receives no model URL or registry option, publishes no host port, and joins
+  only the internal processing network; and
+- reports ready only when llama.cpp's `/health` endpoint confirms the model is
+  loaded.
+
+`deploy/preflight.sh cpu` re-verifies the installed artifact without network
+access before validating Compose. CI renders and policy-checks the real CPU
+profile, pulls the pinned runtime image, and runs application smoke tests under
+the separate model-free `smoke` profile.
+
 The API adapters use the engines' local OpenAI-compatible
 `/v1/chat/completions` endpoints directly through `httpx`; no third-party
 model-provider SDK is used. Model endpoint configuration is restricted to

@@ -1,5 +1,5 @@
 x-app-profile: &app-profile
-  profiles: ["cpu", "gpu"]
+  profiles: ["cpu", "gpu", "smoke"]
 
 x-hardened: &hardened
   restart: unless-stopped
@@ -22,8 +22,8 @@ services:
       ARGUS_LOG_LEVEL: ${ARGUS_LOG_LEVEL:-INFO}
       ARGUS_CORS_ORIGINS: ${ARGUS_CORS_ORIGINS:-http://localhost:8080}
       ARGUS_DEBUG_INFERENCE_ENABLED: ${ARGUS_DEBUG_INFERENCE_ENABLED:-false}
-      ARGUS_MODEL_PROVIDER: ${ARGUS_MODEL_PROVIDER:-fake}
-      ARGUS_MODEL_NAME: ${ARGUS_MODEL_NAME:-argus-smoke-model}
+      ARGUS_MODEL_PROVIDER: ${ARGUS_MODEL_PROVIDER:-llama_cpp}
+      ARGUS_MODEL_NAME: ${ARGUS_MODEL_NAME:-gemma-3-4b-it}
       ARGUS_MODEL_ENDPOINT: ${ARGUS_MODEL_ENDPOINT:-http://inference-cpu:8080/v1}
       ARGUS_MODEL_CONTEXT_CEILING: ${ARGUS_MODEL_CONTEXT_CEILING:-32768}
     depends_on:
@@ -117,6 +117,50 @@ services:
     cpus: ${ARGUS_REDIS_CPUS:-0.5}
     mem_limit: ${ARGUS_REDIS_MEMORY:-256m}
     pids_limit: 64
+
+  inference-cpu:
+    <<: *hardened
+    profiles: ["cpu"]
+    image: ghcr.io/ggml-org/llama.cpp:server-b9445@sha256:8dd148c53936b6e8b0e75309841e66eab13adc50b004a5e86ab1fec477c17d8e
+    user: "10001:10001"
+    command:
+      - --model
+      - /models/gemma-3-4b-it-Q4_K_M.gguf
+      - --alias
+      - ${ARGUS_MODEL_NAME:-gemma-3-4b-it}
+      - --ctx-size
+      - ${ARGUS_MODEL_CONTEXT_CEILING:-32768}
+      - --threads
+      - ${ARGUS_LLAMA_THREADS:-8}
+      - --parallel
+      - ${ARGUS_LLAMA_PARALLEL:-1}
+      - --metrics
+      - --no-ui
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+    environment:
+      HOME: /tmp
+    volumes:
+      - type: bind
+        source: ../models
+        target: /models
+        read_only: true
+    networks:
+      - processing
+    tmpfs:
+      - /tmp:size=64m,mode=1770,uid=10001,gid=10001
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 120s
+    stop_grace_period: 30s
+    cpus: ${ARGUS_LLAMA_CPUS:-6.0}
+    mem_limit: ${ARGUS_LLAMA_MEMORY:-8g}
+    pids_limit: 512
 
 networks:
   edge:

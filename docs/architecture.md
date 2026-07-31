@@ -57,8 +57,9 @@ flowchart LR
   Parser --> Embed
 ```
 
-Phase 0 provisions the web, API, PostgreSQL, and Redis boundaries. Later phases
-fill the already-reserved adapter and service locations.
+Phase 0 provisions the web, API, PostgreSQL, and Redis boundaries. Phase 1 adds
+the isolated llama.cpp CPU runtime behind the provider-neutral model adapter;
+later phases fill the remaining reserved service locations.
 
 ## Data lifecycle
 

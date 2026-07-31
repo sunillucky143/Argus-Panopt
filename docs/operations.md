@@ -18,8 +18,8 @@ by a running processing service.
 
 3. Record the manifest revision and SHA-256 in the change record. Do not copy
    signed download URLs, credentials, or model contents into the record.
-4. Remove external network access before starting processing services. Mount
-   the verified artifact read-only when the llama.cpp runtime is enabled.
+4. Remove external network access before starting processing services. The CPU
+   profile mounts the verified model directory read-only into llama.cpp.
 5. Rerun the command after moving the artifact; an existing artifact is skipped
    only when its exact size and SHA-256 still match.
 
@@ -34,7 +34,8 @@ artifacts after ordinary failures, and reports any cleanup failure.
    restrict file permissions to the deployment account.
 3. Terminate TLS at the deployment reverse proxy using an operator-managed
    certificate and enable HSTS.
-4. Run `./deploy/preflight.sh cpu` or `gpu`.
+4. Run `./deploy/preflight.sh cpu` or `gpu`. CPU preflight fails closed when the
+   pinned model artifact is absent or its checksum has changed.
 5. Run `docker compose --profile <tier> up -d --build`.
 6. Confirm `/api/health/live` and `/api/health/ready` through the TLS endpoint.
 7. Review container health, resource ceilings, and processing network isolation.

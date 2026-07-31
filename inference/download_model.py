@@ -380,6 +380,8 @@ def download_model(
             temporary.flush()
             os.fsync(temporary.fileno())
 
+        os.chmod(temporary_path, 0o644)
+
         if downloaded != manifest.size_bytes:
             raise DownloadError("downloaded artifact size does not match the manifest")
         if digest != manifest.sha256:
@@ -411,6 +413,11 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--manifest", required=True, type=Path)
     parser.add_argument("--output-dir", type=Path, default=Path("models"))
     parser.add_argument("--timeout", type=float, default=120.0)
+    parser.add_argument(
+        "--verify-only",
+        action="store_true",
+        help="verify an installed artifact without using the network",
+    )
     return parser
 
 
@@ -418,11 +425,16 @@ def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
         manifest = load_manifest(args.manifest)
-        installed_path = download_model(
-            manifest,
-            args.output_dir,
-            timeout=args.timeout,
-        )
+        installed_path = args.output_dir.resolve() / manifest.filename
+        if args.verify_only:
+            if not verify_artifact(installed_path, manifest):
+                raise DownloadError("installed model artifact is missing or invalid")
+        else:
+            installed_path = download_model(
+                manifest,
+                args.output_dir,
+                timeout=args.timeout,
+            )
     except (ManifestError, DownloadError) as error:
         print(f"model provisioning failed: {error}", file=sys.stderr)
         return 1

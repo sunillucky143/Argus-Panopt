@@ -11,8 +11,7 @@ readiness, hardened Compose profiles, and CI/security gates.
 ## Prerequisites
 
 - Docker Desktop or Docker Engine with Compose v2
-- 10 GB of free disk for the Phase 0 images; an additional 2.5 GB for the
-  optional Tier S model artifact
+- 15 GB of free disk for the images and Tier S model artifact
 - For development: Python 3.12, [uv](https://docs.astral.sh/uv/), and Node.js 22
 - For the future `gpu` inference profile: NVIDIA driver and Container Toolkit
 
@@ -29,23 +28,31 @@ readiness, hardened Compose profiles, and CI/security gates.
    `sh deploy/init-secrets.sh --force`. The example values are suitable only for
    a local Phase 0 smoke test.
 
-3. Run the preflight and start the stack:
+3. Provision the pinned Tier S model from the repository root:
+
+   ```sh
+   python -m inference.download_model \
+     --manifest inference/manifests/tier-s-gemma-3-4b-it-q4_k_m.json \
+     --output-dir models
+   ```
+
+4. Run the preflight and start the stack:
 
    ```sh
    sh deploy/preflight.sh cpu
    docker compose --profile cpu up --build
    ```
 
-4. Open:
+5. Open:
 
    - App: <http://localhost:8080>
    - API docs: <http://localhost:8080/api/docs>
    - API readiness: <http://localhost:8080/api/health/ready>
 
-The current Compose default uses the deterministic smoke adapter. The Tier S
-weights can now be provisioned with the checksum-verified tool documented in
-[`inference/README.md`](inference/README.md); the next Phase 1 runtime work item
-switches the CPU profile to llama.cpp after verified weights are installed.
+The `cpu` profile starts the digest-pinned llama.cpp server with the verified
+model directory mounted read-only. It has no published port and runs only
+on the internal processing network. See
+[`inference/README.md`](inference/README.md) for runtime details.
 
 Stop the stack with `docker compose --profile cpu down`.
 
@@ -74,6 +81,7 @@ Validate Compose and the no-external-AI policy:
 
 ```sh
 docker compose --env-file deploy/.env.example --profile cpu config --quiet
+python scripts/check_model_runtime_policy.py
 python scripts/check_no_external_ai.py .
 ```
 

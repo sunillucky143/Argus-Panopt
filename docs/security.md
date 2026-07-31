@@ -50,6 +50,10 @@ operator administration plane. Only the reverse proxy is externally reachable.
   Version-controlled manifests pin the immutable source revision, byte size,
   SHA-256 digest, and license; verified artifacts are atomically installed
   before being mounted read-only into an isolated runtime service.
+- The llama.cpp runtime uses a digest-pinned image, non-root identity,
+  read-only root filesystem, dropped capabilities, resource ceilings, no host
+  port, and only the internal processing network. CI validates the rendered
+  policy and CI probes egress from the model image on its actual network policy.
 - INFO logging of document text and prompts is prohibited by policy and review.
 
 ## Required design rules for future phases
