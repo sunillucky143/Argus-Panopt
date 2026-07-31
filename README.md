@@ -11,7 +11,8 @@ readiness, hardened Compose profiles, and CI/security gates.
 ## Prerequisites
 
 - Docker Desktop or Docker Engine with Compose v2
-- 10 GB of free disk for the Phase 0 images
+- 10 GB of free disk for the Phase 0 images; an additional 2.5 GB for the
+  optional Tier S model artifact
 - For development: Python 3.12, [uv](https://docs.astral.sh/uv/), and Node.js 22
 - For the future `gpu` inference profile: NVIDIA driver and Container Toolkit
 
@@ -41,8 +42,10 @@ readiness, hardened Compose profiles, and CI/security gates.
    - API docs: <http://localhost:8080/api/docs>
    - API readiness: <http://localhost:8080/api/health/ready>
 
-The current Compose default uses the deterministic smoke adapter. A later Phase 1
-work item switches the CPU profile to llama.cpp after verified weights are installed.
+The current Compose default uses the deterministic smoke adapter. The Tier S
+weights can now be provisioned with the checksum-verified tool documented in
+[`inference/README.md`](inference/README.md); the next Phase 1 runtime work item
+switches the CPU profile to llama.cpp after verified weights are installed.
 
 Stop the stack with `docker compose --profile cpu down`.
 

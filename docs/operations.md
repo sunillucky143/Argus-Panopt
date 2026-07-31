@@ -1,5 +1,32 @@
 # Operations runbook
 
+## Model provisioning
+
+Model provisioning is a controlled pre-deployment action and is not performed
+by a running processing service.
+
+1. Review the selected manifest under `inference/manifests/` and accept its
+   linked model license.
+2. On an approved staging host with temporary access to the manifest's source,
+   run:
+
+   ```sh
+   python -m inference.download_model \
+     --manifest inference/manifests/tier-s-gemma-3-4b-it-q4_k_m.json \
+     --output-dir models
+   ```
+
+3. Record the manifest revision and SHA-256 in the change record. Do not copy
+   signed download URLs, credentials, or model contents into the record.
+4. Remove external network access before starting processing services. Mount
+   the verified artifact read-only when the llama.cpp runtime is enabled.
+5. Rerun the command after moving the artifact; an existing artifact is skipped
+   only when its exact size and SHA-256 still match.
+
+If provisioning fails, preserve the previous verified artifact. The tool does
+not replace the destination until verification succeeds, removes temporary
+artifacts after ordinary failures, and reports any cleanup failure.
+
 ## Deployment
 
 1. Review `docs/security.md` and size the host for tier S, M, or L.
