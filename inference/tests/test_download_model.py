@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import tempfile
 import unittest
 from io import BytesIO
 from pathlib import Path
 from typing import Any
+from unittest import mock
 
 from inference.download_model import (
     DownloadError,
@@ -231,6 +233,34 @@ class DownloadTests(unittest.TestCase):
             installed = download_model(self.manifest, output, opener=fail_if_called)
 
             self.assertEqual(installed, destination)
+            self.assertTrue(verify_artifact(installed, self.manifest))
+
+    def test_existing_artifact_race_is_overwritten_by_verified_stage(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary)
+            destination = output / self.manifest.filename
+            destination.write_bytes(_ARTIFACT)
+            real_replace = os.replace
+
+            def replace_after_attack(source: Any, target: Any) -> None:
+                Path(target).write_bytes(b"attacker replacement")
+                real_replace(source, target)
+
+            def fail_if_called(_request: object, _timeout: float) -> Any:
+                raise AssertionError("network opener must not be called")
+
+            with mock.patch(
+                "inference.download_model.os.replace",
+                side_effect=replace_after_attack,
+            ):
+                installed = download_model(
+                    self.manifest,
+                    output,
+                    opener=fail_if_called,
+                )
+
+            self.assertTrue(verify_artifact(installed, self.manifest))
+            self.assertEqual(installed.read_bytes(), _ARTIFACT)
 
     def test_refuses_symbolic_link_destination(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

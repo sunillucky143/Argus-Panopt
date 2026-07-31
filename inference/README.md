@@ -20,8 +20,9 @@ Run provisioning from an operator workstation or controlled staging host after
 reviewing and accepting the linked Gemma license. The tool accepts only the
 approved HTTPS source, permits redirects only to approved artifact hosts,
 streams into a temporary file, verifies the exact byte count and SHA-256, and
-atomically installs the artifact. It re-verifies an existing artifact before
-skipping the download and never commits model weights.
+atomically installs the artifact. It stages an existing artifact through one
+open file descriptor and atomically refreshes it only after verification,
+skipping the network without a check/use gap. Model weights are never committed.
 
 Provisioning is the only step that needs access to the upstream artifact host.
 The runtime model service receives a read-only local model mount and remains on

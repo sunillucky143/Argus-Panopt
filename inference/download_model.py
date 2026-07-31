@@ -8,6 +8,7 @@ import json
 import math
 import os
 import re
+import stat
 import sys
 import tempfile
 from collections.abc import Callable, Mapping
@@ -51,9 +52,15 @@ class DownloadError(RuntimeError):
     """The model artifact could not be installed safely."""
 
 
-class DownloadResponse(Protocol):
+class Readable(Protocol):
     def read(self, size: int = -1) -> bytes: ...
 
+
+class Writable(Protocol):
+    def write(self, data: bytes) -> int: ...
+
+
+class DownloadResponse(Readable, Protocol):
     def __enter__(self) -> Self: ...
 
     def __exit__(
@@ -219,21 +226,40 @@ def load_manifest(path: Path) -> ModelManifest:
     return _validate_manifest(data)
 
 
+def _copy_and_hash(
+    source: Readable,
+    destination: Writable,
+    size_limit: int,
+) -> tuple[int, str]:
+    digest = hashlib.sha256()
+    copied = 0
+    while chunk := source.read(_CHUNK_SIZE):
+        copied += len(chunk)
+        if copied > size_limit:
+            break
+        digest.update(chunk)
+        destination.write(chunk)
+    return copied, digest.hexdigest()
+
+
 def verify_artifact(path: Path, manifest: ModelManifest) -> bool:
-    """Return whether an existing artifact has the exact expected size and digest."""
+    """Return whether an artifact snapshot has the expected size and digest."""
 
     if not path.is_file() or path.is_symlink():
         return False
     try:
-        if path.stat().st_size != manifest.size_bytes:
-            return False
-        digest = hashlib.sha256()
         with path.open("rb") as artifact:
-            while chunk := artifact.read(_CHUNK_SIZE):
-                digest.update(chunk)
-        return digest.hexdigest() == manifest.sha256
+            if not stat.S_ISREG(os.fstat(artifact.fileno()).st_mode):
+                return False
+            size, digest = _copy_and_hash(artifact, _NullWriter(), manifest.size_bytes)
+        return size == manifest.size_bytes and digest == manifest.sha256
     except OSError:
         return False
+
+
+class _NullWriter:
+    def write(self, data: bytes) -> int:
+        return len(data)
 
 
 def _validate_redirect_url(url: str) -> None:
@@ -306,8 +332,6 @@ def download_model(
     destination = output_root / manifest.filename
     if destination.is_symlink():
         raise DownloadError("refusing to replace a symbolic link")
-    if verify_artifact(destination, manifest):
-        return destination
 
     request = Request(  # noqa: S310 - URL and redirects are restricted above.
         manifest.source_url,
@@ -323,23 +347,42 @@ def download_model(
             delete=False,
         ) as temporary:
             temporary_path = Path(temporary.name)
-            digest = hashlib.sha256()
-            downloaded = 0
-            with opener(request, timeout) as response:
-                while chunk := response.read(_CHUNK_SIZE):
-                    downloaded += len(chunk)
+            existing_verified = False
+            if destination.exists():
+                try:
+                    with destination.open("rb") as existing:
+                        if stat.S_ISREG(os.fstat(existing.fileno()).st_mode):
+                            downloaded, digest = _copy_and_hash(
+                                existing,
+                                temporary,
+                                manifest.size_bytes,
+                            )
+                            existing_verified = (
+                                downloaded == manifest.size_bytes
+                                and digest == manifest.sha256
+                            )
+                except OSError:
+                    pass
+
+            if not existing_verified:
+                temporary.seek(0)
+                temporary.truncate()
+                with opener(request, timeout) as response:
+                    downloaded, digest = _copy_and_hash(
+                        response,
+                        temporary,
+                        manifest.size_bytes,
+                    )
                     if downloaded > manifest.size_bytes:
                         raise DownloadError(
                             "downloaded artifact exceeds the expected size"
                         )
-                    digest.update(chunk)
-                    temporary.write(chunk)
             temporary.flush()
             os.fsync(temporary.fileno())
 
         if downloaded != manifest.size_bytes:
             raise DownloadError("downloaded artifact size does not match the manifest")
-        if digest.hexdigest() != manifest.sha256:
+        if digest != manifest.sha256:
             raise DownloadError(
                 "downloaded artifact checksum does not match the manifest"
             )
