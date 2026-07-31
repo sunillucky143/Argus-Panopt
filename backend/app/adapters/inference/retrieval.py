@@ -57,7 +57,8 @@ class _LocalRetrievalClient:
         transport: httpx.AsyncBaseTransport | None,
         timeout_seconds: float,
     ) -> None:
-        if not model_name.strip() or len(model_name) > _MAX_IDENTIFIER_CHARACTERS:
+        stripped_name = model_name.strip()
+        if not stripped_name or len(model_name) > _MAX_IDENTIFIER_CHARACTERS:
             raise ValueError("local retrieval model name is invalid")
         if not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
             raise ValueError("local retrieval timeout must be positive and finite")

@@ -231,11 +231,22 @@ def test_adapter_rejects_oversized_response_before_parsing() -> None:
         "http://8.8.8.8:8081",
         "http://user:secret@embedding-service:8081",
         "http://embedding-service:notaport",
+        "http://-embedding-service:8081",
+        "http://embedding-service-:8081",
     ],
 )
 def test_adapters_reject_non_local_endpoints(endpoint: str) -> None:
     with pytest.raises(ValueError, match="retrieval endpoint"):
         EmbeddingServiceAdapter(endpoint=endpoint, model_name="bge-m3")
+
+
+@pytest.mark.parametrize("model_name", ["", "   "])
+def test_adapters_reject_empty_model_names(model_name: str) -> None:
+    with pytest.raises(ValueError, match="model name"):
+        EmbeddingServiceAdapter(
+            endpoint="http://embedding-service:8081",
+            model_name=model_name,
+        )
 
 
 def test_embedding_adapter_rejects_invalid_requests_without_network() -> None:
