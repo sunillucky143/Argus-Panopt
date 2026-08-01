@@ -43,9 +43,12 @@ operator administration plane. Only the reverse proxy is externally reachable.
 - Database/cache credentials enter through Docker secrets.
 - CI blocks known external AI clients and hosts, secrets, critical dependency
   vulnerabilities, and common static-analysis findings.
-- Model adapter configuration accepts only loopback, private-address, or
+- Model and embedding adapter configuration accepts only loopback, private-address, or
   single-label deployment endpoints, blocking explicit public model hosts; the
   internal processing network remains the egress enforcement boundary.
+- Embedding and reranking clients bound batch and text sizes, disable redirects,
+  require finite and structurally complete results, and return generic failures
+  that do not expose input text or local service response bodies.
 - Model weights are acquired only as an explicit operator provisioning action.
   Version-controlled manifests pin the immutable source revision, byte size,
   SHA-256 digest, and license; verified artifacts are atomically installed

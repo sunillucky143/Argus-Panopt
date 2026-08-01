@@ -20,6 +20,9 @@ explicitly enabled. It is never exposed when the application environment is prod
 endpoints remain on the deployment's internal, egress-blocked network.
 A deterministic fake adapter is the first contract implementation and is used by tests.
 
+Embedding and reranking adapters use a bounded internal HTTP contract. They reject public endpoints,
+redirects, mismatched models, malformed vectors or scores, and content-bearing error details.
+
 ## Consequences
 
 - Domain and API code cannot depend on vLLM, llama.cpp, or model-specific request bodies.
