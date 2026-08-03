@@ -292,8 +292,6 @@ def download_bundle(
             os.chmod(target, 0o644)
         if not verify_bundle(temporary_path, manifest):
             raise DownloadError("downloaded model bundle failed final verification")
-        if destination.exists() or destination.is_symlink():
-            raise DownloadError("model bundle destination changed during provisioning")
         os.replace(temporary_path, destination)
         cleanup_path = None
         return destination

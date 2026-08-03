@@ -7,6 +7,7 @@ import unittest
 from io import BytesIO
 from pathlib import Path
 from typing import Any, cast
+from unittest import mock
 from urllib.request import Request
 
 from inference.download_bundle import (
@@ -194,6 +195,31 @@ class BundleProvisioningTests(unittest.TestCase):
 
             self.assertFalse((models / manifest.bundle_id).exists())
             self.assertEqual(list(models.iterdir()), [])
+
+    def test_publish_race_preserves_destination_and_cleans_staging(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            manifest = self._load_fixture(root)
+            models = root / "models"
+            destination = models / manifest.bundle_id
+
+            def opener(_: Request, __: float) -> DownloadResponse:
+                return _response(_ARTIFACT)
+
+            def lose_race(source: Path, target: Path) -> None:
+                self.assertEqual(target, destination)
+                self.assertTrue(verify_bundle(source, manifest))
+                destination.mkdir()
+                (destination / "raced").write_text("preserve", encoding="utf-8")
+                raise FileExistsError
+
+            with mock.patch(
+                "inference.download_bundle.os.replace", side_effect=lose_race
+            ), self.assertRaisesRegex(DownloadError, "FileExistsError"):
+                download_bundle(manifest, models, opener=opener)
+
+            self.assertEqual((destination / "raced").read_text(), "preserve")
+            self.assertEqual(list(models.iterdir()), [destination])
 
     def test_invalid_existing_bundle_is_not_replaced(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
