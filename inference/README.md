@@ -28,6 +28,30 @@ Provisioning is the only step that needs access to the upstream artifact host.
 The runtime model service receives a read-only local model mount and remains on
 the internal processing network with no download path.
 
+## BGE model bundle provisioning
+
+BGE-M3 embeddings and bge-reranker-v2-m3 are pinned as versioned,
+multi-file bundles for the dedicated CPU retrieval runtime:
+
+```sh
+python -m inference.download_bundle \
+  --manifest inference/manifests/bge-m3-onnx-fp32.json \
+  --output-dir models
+```
+
+```sh
+python -m inference.download_bundle \
+  --manifest inference/manifests/bge-reranker-v2-m3-safetensors-fp32.json \
+  --output-dir models
+```
+
+Each manifest restricts the approved BAAI repository, immutable commit,
+runtime format, license, destination filenames, byte counts, and SHA-256
+digests. The installer downloads into a private temporary directory and makes
+the bundle visible only after every file passes a final verification. An
+existing invalid bundle is preserved for investigation instead of being
+overwritten; publish a new bundle ID when model content changes.
+
 Run the offline provisioner tests without downloading model weights:
 
 ```sh

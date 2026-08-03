@@ -50,7 +50,8 @@ Both contracts are bounded to 256 inputs of at most 32,768 characters each.
 Model identifiers must match configuration exactly. Transport and protocol
 errors are generic and never include input text or service response bodies.
 
-The next work item packages the checksum-pinned BGE-M3 and
-bge-reranker-v2-m3 runtime behind this contract. Until that service is added,
-these adapters are contract-tested with an in-memory HTTP transport and are not
-wired into application request paths.
+The BGE-M3 ONNX and bge-reranker-v2-m3 safetensors snapshots now have
+immutable, checksum-pinned bundle manifests and an offline-verifiable
+provisioner. The next work item mounts those bundles into the isolated CPU
+runtime behind this contract. Until then, the adapters remain contract-tested
+with an in-memory HTTP transport and are not wired into application paths.
