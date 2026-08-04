@@ -63,6 +63,21 @@ jobs:
       - run: uv run mypy app tests
       - run: uv run pytest
 
+  evaluations:
+    name: Evaluation harness quality and seed report
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.9.13"
+          enable-cache: true
+      - run: uv sync --project backend --frozen --all-groups
+      - run: uv run --project backend ruff format --check --config backend/pyproject.toml evals
+      - run: uv run --project backend ruff check --config backend/pyproject.toml evals
+      - run: uv run --project backend mypy --strict evals
+      - run: uv run --project backend pytest evals/tests --cov=evals --cov-report=term-missing --cov-fail-under=85
+      - run: uv run --project backend python -m evals.run --runner fixture --report-stem ci-phase1
 
   frontend:
     name: Frontend quality and unit tests
@@ -104,7 +119,7 @@ jobs:
       - working-directory: frontend
         run: npm audit --audit-level=critical
       - name: Semgrep
-        run: uvx semgrep scan --config p/python --error backend/app embedding-service/app
+        run: uvx semgrep scan --config p/python --error backend/app embedding-service/app evals
       - uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,188 @@
+{
+  "schema_version": 1,
+  "dataset_id": "phase1-seed",
+  "description": "Twenty synthetic healthcare document questions for adapter and evaluation-pipeline validation. No record describes a real person.",
+  "synthetic": true,
+  "cases": [
+    {
+      "id": "discharge-medication",
+      "category": "medication",
+      "source_format": "docx",
+      "context": "Discharge medications: lisinopril 10 mg by mouth once daily. Continue until the primary care visit.",
+      "question": "What lisinopril dose and frequency were prescribed at discharge?",
+      "expected_answer": "Take lisinopril 10 mg once daily.",
+      "required_terms": ["lisinopril", "10 mg", "once daily"]
+    },
+    {
+      "id": "anticoagulant-hold",
+      "category": "medication",
+      "source_format": "pdf",
+      "context": "Procedure instructions: hold apixaban for 48 hours before the procedure. Restart only when the procedural clinician approves.",
+      "question": "How long before the procedure should apixaban be held?",
+      "expected_answer": "Hold apixaban for 48 hours before the procedure.",
+      "required_terms": ["apixaban", "48 hours", "before"]
+    },
+    {
+      "id": "documented-allergy",
+      "category": "allergy",
+      "source_format": "docx",
+      "context": "Allergies: penicillin caused hives. No latex allergy is documented.",
+      "question": "What reaction to penicillin is documented?",
+      "expected_answer": "Penicillin caused hives.",
+      "required_terms": ["penicillin", "hives"]
+    },
+    {
+      "id": "a1c-result",
+      "category": "laboratory",
+      "source_format": "xlsx",
+      "context": "Laboratory results table. Hemoglobin A1c | 7.2 percent | High | 2026-05-14.",
+      "question": "What was the hemoglobin A1c result?",
+      "expected_answer": "The hemoglobin A1c was 7.2 percent.",
+      "required_terms": ["hemoglobin a1c", "7.2 percent"]
+    },
+    {
+      "id": "egfr-result",
+      "category": "laboratory",
+      "source_format": "xlsx",
+      "context": "Renal panel. Creatinine | 1.1 mg/dL. Estimated GFR | 68 mL/min/1.73 m2.",
+      "question": "What estimated GFR is listed?",
+      "expected_answer": "The estimated GFR is 68 mL/min/1.73 m2.",
+      "required_terms": ["estimated gfr", "68 ml min 1.73 m2"]
+    },
+    {
+      "id": "follow-up-interval",
+      "category": "follow-up",
+      "source_format": "pdf",
+      "context": "Plan: schedule a cardiology follow-up in six weeks. Seek urgent care sooner for chest pain or fainting.",
+      "question": "When should cardiology follow-up occur?",
+      "expected_answer": "Cardiology follow-up should occur in six weeks.",
+      "required_terms": ["cardiology", "six weeks"]
+    },
+    {
+      "id": "imaging-impression",
+      "category": "imaging",
+      "source_format": "pdf",
+      "context": "Chest radiograph impression: no focal airspace opacity. No pleural effusion or pneumothorax.",
+      "question": "Did the radiograph show a pleural effusion?",
+      "expected_answer": "No pleural effusion was seen.",
+      "required_terms": ["no", "pleural effusion"]
+    },
+    {
+      "id": "vaccine-date",
+      "category": "immunization",
+      "source_format": "xlsx",
+      "context": "Immunization register. Influenza vaccine | administered | 2025-10-03. Pneumococcal vaccine | administered | 2024-09-18.",
+      "question": "When was the influenza vaccine administered?",
+      "expected_answer": "The influenza vaccine was administered on 2025-10-03.",
+      "required_terms": ["influenza", "2025-10-03"]
+    },
+    {
+      "id": "blood-pressure-trend",
+      "category": "vitals",
+      "source_format": "xlsx",
+      "context": "Visit vitals. 2026-01-08 | 148/92 mmHg. 2026-02-12 | 136/84 mmHg. 2026-03-19 | 128/78 mmHg.",
+      "question": "What was the most recent blood pressure?",
+      "expected_answer": "The most recent blood pressure was 128/78 mmHg.",
+      "required_terms": ["most recent", "128 78 mmhg"]
+    },
+    {
+      "id": "procedure-finding",
+      "category": "procedure",
+      "source_format": "pdf",
+      "context": "Colonoscopy findings: one 4 mm sigmoid polyp was removed with a cold snare. Pathology is pending.",
+      "question": "What was removed during the colonoscopy?",
+      "expected_answer": "One 4 mm sigmoid polyp was removed.",
+      "required_terms": ["4 mm", "sigmoid polyp", "removed"]
+    },
+    {
+      "id": "primary-diagnosis",
+      "category": "diagnosis",
+      "source_format": "docx",
+      "context": "Assessment: primary diagnosis is community-acquired pneumonia. Secondary diagnosis is mild dehydration.",
+      "question": "What is the primary diagnosis?",
+      "expected_answer": "The primary diagnosis is community-acquired pneumonia.",
+      "required_terms": ["primary diagnosis", "community acquired pneumonia"]
+    },
+    {
+      "id": "wound-care",
+      "category": "instruction",
+      "source_format": "docx",
+      "context": "Wound care: keep the dressing dry for 24 hours, then replace it daily. Do not soak the incision for seven days.",
+      "question": "How long should the initial dressing remain dry?",
+      "expected_answer": "Keep the initial dressing dry for 24 hours.",
+      "required_terms": ["dressing", "dry", "24 hours"]
+    },
+    {
+      "id": "ocr-appointment",
+      "category": "appointment",
+      "source_format": "pdf",
+      "context": "Synthetic OCR transcription from a scanned notice: NEUROLOGY APPOINTMENT - 14 AUG 2026 - 09:30 AM - BUILDING C.",
+      "question": "When is the neurology appointment?",
+      "expected_answer": "The neurology appointment is 14 August 2026 at 09:30 AM.",
+      "required_terms": ["14 august 2026", "09 30 am"]
+    },
+    {
+      "id": "weight-change",
+      "category": "vitals",
+      "source_format": "xlsx",
+      "context": "Weight history chart data. January | 82.0 kg. February | 80.5 kg. March | 79.0 kg.",
+      "question": "How much did weight decrease from January to March?",
+      "expected_answer": "Weight decreased by 3.0 kg from January to March.",
+      "required_terms": ["decreased", "3.0 kg", "january", "march"]
+    },
+    {
+      "id": "specialist-referral",
+      "category": "referral",
+      "source_format": "docx",
+      "context": "Referral order: refer to endocrinology for evaluation of persistent hypercalcemia. Priority: routine.",
+      "question": "Which specialty should evaluate the persistent hypercalcemia?",
+      "expected_answer": "Endocrinology should evaluate the persistent hypercalcemia.",
+      "required_terms": ["endocrinology", "hypercalcemia"]
+    },
+    {
+      "id": "contrast-contraindication",
+      "category": "safety",
+      "source_format": "pdf",
+      "context": "Imaging safety note: do not administer iodinated contrast because of a prior severe anaphylactic reaction.",
+      "question": "Why should iodinated contrast not be administered?",
+      "expected_answer": "It should not be administered because of a prior severe anaphylactic reaction.",
+      "required_terms": ["not", "severe anaphylactic reaction"]
+    },
+    {
+      "id": "dose-change",
+      "category": "medication",
+      "source_format": "docx",
+      "context": "Medication change dated 2026-06-02: increase metoprolol succinate from 25 mg daily to 50 mg daily.",
+      "question": "What is the new metoprolol succinate dose?",
+      "expected_answer": "The new metoprolol succinate dose is 50 mg daily.",
+      "required_terms": ["metoprolol succinate", "50 mg daily"]
+    },
+    {
+      "id": "unsupported-family-history",
+      "category": "refusal",
+      "source_format": "pdf",
+      "context": "The note contains current medications, vital signs, and the assessment. It does not include family history.",
+      "question": "What cardiac condition did the patient's father have?",
+      "expected_answer": "Not found in the provided documents.",
+      "required_terms": ["not found", "provided documents"]
+    },
+    {
+      "id": "latest-potassium",
+      "category": "laboratory",
+      "source_format": "xlsx",
+      "context": "Potassium results. 2026-04-01 | 5.4 mmol/L. 2026-04-03 | 4.6 mmol/L. The later result supersedes the earlier value.",
+      "question": "What is the latest potassium result?",
+      "expected_answer": "The latest potassium result is 4.6 mmol/L.",
+      "required_terms": ["latest", "4.6 mmol l"]
+    },
+    {
+      "id": "spreadsheet-instruction",
+      "category": "instruction",
+      "source_format": "xlsx",
+      "context": "Care plan worksheet. Row 12 | Fluid limit | 1.5 liters per day. Row 13 | Daily weight | record every morning.",
+      "question": "What daily fluid limit is recorded?",
+      "expected_answer": "The recorded fluid limit is 1.5 liters per day.",
+      "required_terms": ["fluid limit", "1.5 liters per day"]
+    }
+  ]
+}

@@ -6,7 +6,8 @@ inference are designed to remain inside the operator's deployment.
 
 This repository contains the Phase 0 production foundation and active **Phase 1**
 inference work: provider-neutral model ports, local streaming adapters, model-aware
-readiness, hardened Compose profiles, and CI/security gates.
+readiness, a 20-case synthetic evaluation harness, hardened Compose profiles,
+and CI/security gates.
 
 ## Prerequisites
 
@@ -76,6 +77,14 @@ cd frontend
 npm ci
 npm run check
 ```
+
+Run the synthetic Phase 1 evaluation seed and produce metadata-only reports:
+
+```sh
+uv run --project backend python -m evals.run --runner fixture
+```
+
+See [`evals/README.md`](evals/README.md) for local-adapter evaluation options.
 
 Validate Compose and the no-external-AI policy:
 

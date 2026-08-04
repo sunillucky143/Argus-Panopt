@@ -66,6 +66,11 @@ operator administration plane. Only the reverse proxy is externally reachable.
   responses, validates finite and complete results, suppresses access logs, and
   emits only generic content-safe failures.
 - INFO logging of document text and prompts is prohibited by policy and review.
+- Evaluation fixtures are synthetic. Generated reports contain identifiers,
+  scores, timings, finish reasons, errors, and response hashes, never evaluated
+  contexts, prompts, expected answers, or generated text.
+- The evaluation HTTP runner accepts deployment-local endpoints only and
+  disables redirects and inherited proxy settings.
 
 ## Required design rules for future phases
 
