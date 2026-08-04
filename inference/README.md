@@ -28,6 +28,22 @@ Provisioning is the only step that needs access to the upstream artifact host.
 The runtime model service receives a read-only local model mount and remains on
 the internal processing network with no download path.
 
+## Tier M model provisioning
+
+The Tier M GPU baseline is Qwen2.5-VL-7B-Instruct-AWQ. Its bundle manifest
+pins the official repository revision and every configuration, tokenizer, and
+safetensors shard by filename, byte count, and SHA-256:
+
+```sh
+python -m inference.download_bundle \
+  --manifest inference/manifests/tier-m-qwen2.5-vl-7b-instruct-awq.json \
+  --output-dir models
+```
+
+Review the pinned Apache-2.0 model card before provisioning. The same strict,
+atomic multi-file installer used for retrieval bundles downloads the Qwen
+bundle. The running vLLM service has no download path or writable model mount.
+
 ## BGE model bundle provisioning
 
 BGE-M3 embeddings and bge-reranker-v2-m3 are pinned as versioned,
@@ -61,6 +77,7 @@ python -m unittest discover -s inference/tests -v
 When updating a model, add a new manifest after separately confirming the
 immutable upstream revision, exact byte size, license, and SHA-256. Do not edit
 an existing manifest in place for a different artifact.
+
 ## Local retrieval runtime
 
 The Compose `cpu` and `gpu` profiles mount the exact BGE bundle IDs above
@@ -76,7 +93,23 @@ enforces the image digest, local command, exact mount source, offline
 environment, network isolation, non-root identity, read-only filesystem, and
 resource ceilings. The pinned TEI CPU image currently requires `linux/amd64`.
 
+## vLLM GPU runtime
 
+The Compose `gpu` profile starts vLLM 0.26.0 from a pinned CUDA 12.9 AMD64
+image digest and reserves exactly one NVIDIA GPU. Tier M is configured for a
+24 GB card with Qwen AWQ, a 65,536-token ceiling, FP8 KV cache, prefix caching,
+n-gram speculative decoding, and at most 30 concurrent sequences.
+
+The service runs as UID/GID 10001 with a read-only root filesystem, dropped
+capabilities, bounded shared memory/tmpfs, and CPU/RAM/PID ceilings. Hugging
+Face and Transformers offline modes and vLLM usage-stat opt-out are forced.
+Request, response, access, and API-documentation logging are disabled. The
+exact verified Qwen bundle is mounted read-only at `/models/model`; the service
+publishes no port and joins only the internal processing network.
+
+`deploy/preflight.sh gpu` requires the Tier M adapter values, verifies the
+complete Qwen and BGE bundles without network access, checks the NVIDIA runtime
+and at least 24 GB of VRAM, then validates Compose.
 
 ## llama.cpp CPU runtime
 

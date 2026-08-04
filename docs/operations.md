@@ -16,6 +16,14 @@ by a running processing service.
      --output-dir models
    ```
 
+For the Tier M Qwen bundle, run:
+
+```sh
+python -m inference.download_bundle \
+  --manifest inference/manifests/tier-m-qwen2.5-vl-7b-instruct-awq.json \
+  --output-dir models
+```
+
 For the two BGE retrieval bundles, run:
 
 ```sh
@@ -44,15 +52,20 @@ artifacts after ordinary failures, and reports any cleanup failure.
 1. Review `docs/security.md` and size the host for tier S, M, or L.
 2. Copy `deploy/.env.example` to `.env`, replace all example credentials, and
    restrict file permissions to the deployment account.
+   For Tier M, also replace `ARGUS_TIER` and the four `ARGUS_MODEL_*` values
+   with the GPU values documented in the example file.
 3. Terminate TLS at the deployment reverse proxy using an operator-managed
    certificate and enable HSTS.
 4. Run `./deploy/preflight.sh cpu` or `gpu`. Preflight fails closed when
-   either retrieval bundle is absent or fails checksum verification; CPU also
-   verifies the pinned llama.cpp artifact. The TEI CPU workers require AMD64.
+   any required bundle is absent or fails checksum verification. CPU verifies
+   the pinned llama.cpp artifact; GPU verifies Qwen, the adapter/profile
+   alignment, NVIDIA Container Toolkit, and at least 24 GB VRAM. The vLLM and
+   TEI images require AMD64.
 5. Run `docker compose --profile <tier> up -d --build`.
 6. Confirm `/api/health/live` and `/api/health/ready` through the TLS endpoint.
-7. Confirm `embedding-service`, `embedding-engine`, and `reranker-engine`
-   are healthy with `docker compose ps`.
+7. Confirm the selected inference service, `embedding-service`,
+   `embedding-engine`, and `reranker-engine` are healthy with
+   `docker compose ps`.
 8. Review container health, resource ceilings, and processing network isolation.
 
 Never place PHI or secrets in command history, tickets, screenshots, or support

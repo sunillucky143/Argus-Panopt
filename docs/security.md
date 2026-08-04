@@ -59,6 +59,12 @@ operator administration plane. Only the reverse proxy is externally reachable.
   read-only root filesystem, dropped capabilities, resource ceilings, no host
   port, and only the internal processing network. CI validates the rendered
   policy and CI probes egress from the model image on its actual network policy.
+- The vLLM Tier M runtime uses a digest-pinned image, exactly one NVIDIA GPU,
+  bounded shared memory and container resources, forced offline model-library
+  settings, usage-stat opt-out, and an exact read-only verified Qwen bundle.
+  Request/output/access logging and API docs are disabled. It publishes no
+  port and joins only the internal processing network. CI renders the GPU
+  profile and enforces these controls without pulling the large CUDA image.
 - The retrieval gateway and both TEI workers use the same internal-only
   processing network and publish no ports. TEI runs from a digest-pinned image
   in forced offline mode with exact read-only verified bundle mounts. The

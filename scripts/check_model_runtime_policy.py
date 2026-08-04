@@ -19,6 +19,12 @@ _PINNED_LLAMA_IMAGE = (
     "ghcr.io/ggml-org/llama.cpp:server-b9445@"
     "sha256:8dd148c53936b6e8b0e75309841e66eab13adc50b004a5e86ab1fec477c17d8e"
 )
+_PINNED_VLLM_IMAGE = (
+    "vllm/vllm-openai:v0.26.0-x86_64-cu129-ubuntu2404@"
+    "sha256:4d08193d2fd05aadb1b5678f93ae609efb2635df67da45f3efe781c368b34dc8"
+)
+_QWEN_BUNDLE_ID = "qwen2.5-vl-7b-instruct-awq-536a357"
+
 _PINNED_TEI_IMAGE = (
     "ghcr.io/huggingface/text-embeddings-inference:cpu-1.9.1@"
     "sha256:b7772cdd9dcbced147b16a7dff17d4aed1ab36333f8d3e686c50d2175e1d2126"
@@ -36,6 +42,10 @@ _COMPOSE_OVERRIDE_KEYS = (
     "ARGUS_LLAMA_MEMORY",
     "ARGUS_LLAMA_THREADS",
     "ARGUS_LLAMA_PARALLEL",
+    "ARGUS_VLLM_CPUS",
+    "ARGUS_VLLM_MEMORY",
+    "ARGUS_VLLM_GPU_MEMORY_UTILIZATION",
+    "ARGUS_VLLM_MAX_NUM_SEQS",
     "ARGUS_EMBEDDING_MODEL",
     "ARGUS_RERANKER_MODEL",
     "ARGUS_RETRIEVAL_TIMEOUT_SECONDS",
@@ -218,6 +228,127 @@ def _validate_llama(services: Mapping[str, Any]) -> None:
     )
 
 
+def _validate_vllm(services: Mapping[str, Any]) -> None:
+    runtime = _mapping(services.get("inference-gpu"), "inference-gpu")
+    api = _mapping(services.get("api"), "api")
+
+    _require(
+        runtime.get("image") == _PINNED_VLLM_IMAGE,
+        "vLLM image must be digest-pinned",
+    )
+    _require(
+        runtime.get("profiles") == ["gpu"],
+        "inference-gpu must be GPU-profile only",
+    )
+    _require(
+        runtime.get("platform") == "linux/amd64",
+        "inference-gpu must pin its supported platform",
+    )
+    _validate_hardening(
+        runtime,
+        "inference-gpu",
+        pids_limit=1024,
+        max_cpus=8.0,
+        max_memory=16 * 1024**3,
+    )
+
+    command = _list(runtime.get("command"), "inference-gpu command")
+    command_text = " ".join(str(item) for item in command)
+    required_arguments = (
+        "--model /models/model",
+        "--served-model-name qwen2.5-vl-7b-instruct-awq",
+        "--host 0.0.0.0",
+        "--port 8000",
+        "--quantization awq",
+        "--max-model-len 65536",
+        "--kv-cache-dtype fp8",
+        "--enable-prefix-caching",
+        '"method":"ngram"',
+        '"num_speculative_tokens":4',
+        '"prompt_lookup_min":2',
+        '"prompt_lookup_max":5',
+        "--gpu-memory-utilization 0.90",
+        "--max-num-seqs 30",
+        '"image":8',
+        '"video":0',
+        "--no-enable-log-requests",
+        "--no-enable-log-outputs",
+        "--disable-uvicorn-access-log",
+        "--disable-fastapi-docs",
+    )
+    for argument in required_arguments:
+        _require(argument in command_text, f"vLLM must set {argument}")
+    for forbidden in ("http://", "https://", "--revision", "--token"):
+        _require(
+            forbidden not in command_text,
+            f"vLLM command contains forbidden source: {forbidden}",
+        )
+
+    environment = _mapping(runtime.get("environment"), "vLLM environment")
+    expected_environment = {
+        "HOME": "/tmp",
+        "HF_HOME": "/tmp/huggingface",
+        "HF_HUB_CACHE": "/tmp/huggingface",
+        "HF_HUB_OFFLINE": "1",
+        "HF_HUB_DISABLE_TELEMETRY": "1",
+        "TRANSFORMERS_OFFLINE": "1",
+        "VLLM_NO_USAGE_STATS": "1",
+        "DO_NOT_TRACK": "1",
+    }
+    for key, value in expected_environment.items():
+        _require(environment.get(key) == value, f"vLLM must pin {key}")
+
+    volumes = _list(runtime.get("volumes"), "inference-gpu volumes")
+    _require(len(volumes) == 1, "inference-gpu must have one model mount")
+    volume = _mapping(volumes[0], "vLLM model mount")
+    _require(
+        Path(str(volume.get("source"))).resolve()
+        == (_ROOT / "models" / _QWEN_BUNDLE_ID).resolve(),
+        "vLLM must mount the verified Qwen bundle",
+    )
+    _require(
+        volume.get("target") == "/models/model",
+        "vLLM model mount target is invalid",
+    )
+    _require(volume.get("read_only") is True, "vLLM model mount must be read-only")
+
+    _require(runtime.get("ipc") is None, "vLLM must not share the host IPC namespace")
+    _require(
+        int(runtime.get("shm_size", 0)) == 4 * 1024**3,
+        "vLLM shared memory must remain bounded",
+    )
+    deploy = _mapping(runtime.get("deploy"), "vLLM deployment")
+    resources = _mapping(deploy.get("resources"), "vLLM resources")
+    reservations = _mapping(resources.get("reservations"), "vLLM reservations")
+    devices = _list(reservations.get("devices"), "vLLM device reservations")
+    _require(len(devices) == 1, "vLLM must reserve exactly one GPU")
+    device = _mapping(devices[0], "vLLM GPU reservation")
+    _require(
+        device.get("driver") == "nvidia"
+        and device.get("count") == 1
+        and device.get("capabilities") == ["gpu"],
+        "vLLM GPU reservation is invalid",
+    )
+
+    healthcheck = _mapping(runtime.get("healthcheck"), "vLLM healthcheck")
+    healthcheck_test = _list(healthcheck.get("test"), "vLLM healthcheck test")
+    _require(
+        "http://127.0.0.1:8000/health"
+        in " ".join(str(item) for item in healthcheck_test),
+        "inference-gpu must probe local vLLM readiness",
+    )
+
+    api_environment = _mapping(api.get("environment"), "API environment")
+    expected_api = {
+        "ARGUS_MODEL_PROVIDER": "vllm",
+        "ARGUS_MODEL_NAME": "qwen2.5-vl-7b-instruct-awq",
+        "ARGUS_MODEL_ENDPOINT": "http://inference-gpu:8000/v1",
+        "ARGUS_MODEL_CONTEXT_CEILING": "65536",
+    }
+    for key, value in expected_api.items():
+        _require(api_environment.get(key) == value, f"GPU profile must pin {key}")
+
+
 def _validate_retrieval_gateway(services: Mapping[str, Any]) -> None:
     gateway = _mapping(services.get("embedding-service"), "embedding-service")
     _require(
@@ -327,9 +458,8 @@ def _validate_retrieval_worker(
     )
 
 
-def _validate_cpu_profile(config: Mapping[str, Any]) -> None:
+def _validate_retrieval_profile(config: Mapping[str, Any]) -> None:
     services = _mapping(config.get("services"), "services")
-    _validate_llama(services)
     _validate_retrieval_gateway(services)
     for name, bundle_id in _RETRIEVAL_WORKERS.items():
         _validate_retrieval_worker(services, name, bundle_id)
@@ -355,9 +485,26 @@ def _validate_cpu_profile(config: Mapping[str, Any]) -> None:
     _require(processing.get("internal") is True, "processing network must block egress")
 
 
+def _validate_cpu_profile(config: Mapping[str, Any]) -> None:
+    services = _mapping(config.get("services"), "services")
+    _validate_llama(services)
+    _validate_retrieval_profile(config)
+
+
+def _validate_gpu_profile(config: Mapping[str, Any]) -> None:
+    services = _mapping(config.get("services"), "services")
+    _validate_vllm(services)
+    _validate_retrieval_profile(config)
+
+
 def _validate_smoke_profile(config: Mapping[str, Any]) -> None:
     services = _mapping(config.get("services"), "smoke services")
-    for name in ("inference-cpu", "embedding-service", *_RETRIEVAL_WORKERS):
+    for name in (
+        "inference-cpu",
+        "inference-gpu",
+        "embedding-service",
+        *_RETRIEVAL_WORKERS,
+    ):
         _require(name not in services, f"smoke profile must not start {name}")
     api = _mapping(services.get("api"), "smoke API")
     environment = _mapping(api.get("environment"), "smoke API environment")
@@ -370,6 +517,17 @@ def _validate_smoke_profile(config: Mapping[str, Any]) -> None:
 def main() -> int:
     try:
         _validate_cpu_profile(_render("cpu"))
+        _validate_gpu_profile(
+            _render(
+                "gpu",
+                {
+                    "ARGUS_MODEL_PROVIDER": "vllm",
+                    "ARGUS_MODEL_NAME": "qwen2.5-vl-7b-instruct-awq",
+                    "ARGUS_MODEL_ENDPOINT": "http://inference-gpu:8000/v1",
+                    "ARGUS_MODEL_CONTEXT_CEILING": "65536",
+                },
+            )
+        )
         _validate_smoke_profile(
             _render(
                 "smoke",

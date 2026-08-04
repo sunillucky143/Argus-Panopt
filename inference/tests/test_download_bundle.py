@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import stat
 import tempfile
 import unittest
 from io import BytesIO
@@ -65,6 +67,9 @@ class BundleManifestTests(unittest.TestCase):
         reranker = load_bundle_manifest(
             _MANIFEST_ROOT / "bge-reranker-v2-m3-safetensors-fp32.json"
         )
+        qwen = load_bundle_manifest(
+            _MANIFEST_ROOT / "tier-m-qwen2.5-vl-7b-instruct-awq.json"
+        )
 
         self.assertEqual(embedding.revision, "5617a9f61b028005a4858fdac845db406aefb181")
         self.assertEqual(len(embedding.artifacts), 8)
@@ -76,6 +81,18 @@ class BundleManifestTests(unittest.TestCase):
         self.assertEqual(reranker.revision, "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e")
         self.assertEqual(len(reranker.artifacts), 6)
         self.assertEqual(reranker.artifacts[1].size_bytes, 2_271_071_852)
+        self.assertEqual(qwen.revision, "536a35794df8831aa814970ee8f89eff577e7718")
+        self.assertEqual(qwen.engine, "vllm")
+        self.assertEqual(len(qwen.artifacts), 13)
+        self.assertEqual(
+            sum(artifact.size_bytes for artifact in qwen.artifacts),
+            6_939_943_008,
+        )
+        self.assertEqual(qwen.artifacts[6].size_bytes, 3_982_163_944)
+        self.assertEqual(
+            qwen.artifacts[6].sha256,
+            "4f75e3de726546ee43620d1227d3596cd3ba0fdd19f11faeea71de578d2d1052",
+        )
 
     def test_rejects_duplicate_manifest_keys(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -151,6 +168,8 @@ class BundleProvisioningTests(unittest.TestCase):
             installed = download_bundle(manifest, root / "models", opener=opener)
 
             self.assertTrue(verify_bundle(installed, manifest))
+            if os.name == "posix":
+                self.assertEqual(stat.S_IMODE(installed.stat().st_mode), 0o755)
             self.assertEqual((installed / "config.json").read_bytes(), _ARTIFACT)
             self.assertEqual(
                 requests,
