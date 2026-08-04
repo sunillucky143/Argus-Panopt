@@ -50,9 +50,11 @@ operator administration plane. Only the reverse proxy is externally reachable.
   require finite and structurally complete results, and return generic failures
   that do not expose input text or local service response bodies.
 - Model weights are acquired only as an explicit operator provisioning action.
-  Version-controlled manifests pin the immutable source revision, byte size,
-  SHA-256 digest, and license; verified artifacts are atomically installed
-  before being mounted read-only into an isolated runtime service.
+  Version-controlled single-artifact and multi-file bundle manifests restrict
+  approved repositories and pin immutable revisions, byte sizes, SHA-256
+  digests, runtime formats, and licenses. A bundle is installed atomically only
+  after every file verifies; unexpected files and invalid existing bundles fail
+  closed before any read-only runtime mount is allowed.
 - The llama.cpp runtime uses a digest-pinned image, non-root identity,
   read-only root filesystem, dropped capabilities, resource ceilings, no host
   port, and only the internal processing network. CI validates the rendered

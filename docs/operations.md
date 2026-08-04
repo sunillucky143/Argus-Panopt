@@ -16,12 +16,24 @@ by a running processing service.
      --output-dir models
    ```
 
-3. Record the manifest revision and SHA-256 in the change record. Do not copy
-   signed download URLs, credentials, or model contents into the record.
-4. Remove external network access before starting processing services. The CPU
-   profile mounts the verified model directory read-only into llama.cpp.
-5. Rerun the command after moving the artifact; an existing artifact is skipped
-   only when its exact size and SHA-256 still match.
+For the two BGE retrieval bundles, run:
+
+```sh
+python -m inference.download_bundle --manifest inference/manifests/bge-m3-onnx-fp32.json --output-dir models
+python -m inference.download_bundle --manifest inference/manifests/bge-reranker-v2-m3-safetensors-fp32.json --output-dir models
+```
+
+Bundle directories become visible only after every required file passes its
+size and checksum checks. A valid existing bundle skips the network; an
+invalid existing bundle is preserved and fails closed.
+
+3. Record each manifest revision and SHA-256 value in the change record. Do not
+   copy signed download URLs, credentials, or model contents into the record.
+4. Remove external network access before starting processing services. Runtime
+   services receive only verified, read-only model mounts.
+5. Rerun the relevant command after moving an artifact or bundle. Existing
+   content skips the network only when every exact size and SHA-256 still
+   matches.
 
 If provisioning fails, preserve the previous verified artifact. The tool does
 not replace the destination until verification succeeds, removes temporary
