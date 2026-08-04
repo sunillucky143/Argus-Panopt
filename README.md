@@ -12,9 +12,10 @@ and CI/security gates.
 ## Prerequisites
 
 - Docker Desktop or Docker Engine with Compose v2
-- 15 GB of free disk for the images and Tier S model artifact
+- Tier S CPU: 15 GB of free disk
+- Tier M GPU: 30 GB free disk, AMD64, one 24 GB NVIDIA GPU, driver, and
+  NVIDIA Container Toolkit
 - For development: Python 3.12, [uv](https://docs.astral.sh/uv/), and Node.js 22
-- For the future `gpu` inference profile: NVIDIA driver and Container Toolkit
 
 ## Quickstart (CPU)
 
@@ -57,6 +58,35 @@ on the internal processing network. See
 
 Stop the stack with `docker compose --profile cpu down`.
 
+## Quickstart (GPU)
+
+Tier M requires an AMD64 host, at least 30 GB of free disk, one NVIDIA GPU with
+at least 24 GB VRAM, a working NVIDIA driver, and NVIDIA Container Toolkit.
+
+1. Complete steps 1 and 2 from the CPU quickstart, then replace these `.env`
+   values:
+
+   ```dotenv
+   ARGUS_TIER=M
+   ARGUS_MODEL_PROVIDER=vllm
+   ARGUS_MODEL_NAME=qwen2.5-vl-7b-instruct-awq
+   ARGUS_MODEL_ENDPOINT=http://inference-gpu:8000/v1
+   ARGUS_MODEL_CONTEXT_CEILING=65536
+   ```
+
+2. Provision the pinned Qwen and both BGE bundles documented in
+   [`inference/README.md`](inference/README.md).
+
+3. Run the GPU preflight and start Tier M:
+
+   ```sh
+   sh deploy/preflight.sh gpu
+   docker compose --profile gpu up --build
+   ```
+
+The vLLM port is not published to the host. Use the app and readiness URLs
+listed above, and stop with `docker compose --profile gpu down`.
+
 ## Local development
 
 Backend:
@@ -90,6 +120,7 @@ Validate Compose and the no-external-AI policy:
 
 ```sh
 docker compose --env-file deploy/.env.example --profile cpu config --quiet
+docker compose --env-file deploy/.env.example --profile gpu config --quiet
 python scripts/check_model_runtime_policy.py
 python scripts/check_no_external_ai.py .
 ```

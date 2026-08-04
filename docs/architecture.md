@@ -58,8 +58,9 @@ flowchart LR
 ```
 
 Phase 0 provisions the web, API, PostgreSQL, and Redis boundaries. Phase 1 adds
-the isolated llama.cpp CPU runtime behind the provider-neutral model adapter;
-later phases fill the remaining reserved service locations.
+isolated llama.cpp CPU and vLLM GPU runtimes behind the provider-neutral model
+adapter, plus the internal BGE retrieval gateway and workers. Later phases fill
+the remaining reserved service locations.
 
 ## Data lifecycle
 

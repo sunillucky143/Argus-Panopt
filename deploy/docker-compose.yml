@@ -165,6 +165,77 @@ services:
     mem_limit: ${ARGUS_LLAMA_MEMORY:-8g}
     pids_limit: 512
 
+  inference-gpu:
+    <<: *hardened
+    profiles: ["gpu"]
+    platform: linux/amd64
+    image: vllm/vllm-openai:v0.26.0-x86_64-cu129-ubuntu2404@sha256:4d08193d2fd05aadb1b5678f93ae609efb2635df67da45f3efe781c368b34dc8
+    user: "10001:10001"
+    command:
+      - --model
+      - /models/model
+      - --served-model-name
+      - ${ARGUS_MODEL_NAME:-qwen2.5-vl-7b-instruct-awq}
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --quantization
+      - awq
+      - --max-model-len
+      - ${ARGUS_MODEL_CONTEXT_CEILING:-65536}
+      - --kv-cache-dtype
+      - fp8
+      - --enable-prefix-caching
+      - --speculative-config
+      - '{"method":"ngram","num_speculative_tokens":4,"prompt_lookup_min":2,"prompt_lookup_max":5}'
+      - --gpu-memory-utilization
+      - ${ARGUS_VLLM_GPU_MEMORY_UTILIZATION:-0.90}
+      - --max-num-seqs
+      - ${ARGUS_VLLM_MAX_NUM_SEQS:-30}
+      - --limit-mm-per-prompt
+      - '{"image":8,"video":0}'
+      - --no-enable-log-requests
+      - --no-enable-log-outputs
+      - --disable-uvicorn-access-log
+      - --disable-fastapi-docs
+    environment:
+      HOME: /tmp
+      HF_HOME: /tmp/huggingface
+      HF_HUB_CACHE: /tmp/huggingface
+      HF_HUB_OFFLINE: "1"
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      VLLM_NO_USAGE_STATS: "1"
+      DO_NOT_TRACK: "1"
+    volumes:
+      - type: bind
+        source: ../models/qwen2.5-vl-7b-instruct-awq-536a357
+        target: /models/model
+        read_only: true
+    networks:
+      - processing
+    tmpfs:
+      - /tmp:size=2g,mode=1770,uid=10001,gid=10001
+    shm_size: 4gb
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://127.0.0.1:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 300s
+    stop_grace_period: 60s
+    cpus: ${ARGUS_VLLM_CPUS:-8.0}
+    mem_limit: ${ARGUS_VLLM_MEMORY:-16g}
+    pids_limit: 1024
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
   embedding-service:
     <<: *hardened
     profiles: ["cpu", "gpu"]

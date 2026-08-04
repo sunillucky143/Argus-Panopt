@@ -46,11 +46,23 @@ _EXPECTED_KEYS = {
 }
 _ARTIFACT_KEYS = {"source_path", "filename", "size_bytes", "sha256"}
 _APPROVED_MODELS = {
-    "bge-m3": ("BAAI/bge-m3", "onnx-fp32", "MIT"),
+    "bge-m3": (
+        "BAAI/bge-m3",
+        "onnx-fp32",
+        "MIT",
+        "text-embeddings-inference",
+    ),
     "bge-reranker-v2-m3": (
         "BAAI/bge-reranker-v2-m3",
         "safetensors-fp32",
         "Apache-2.0",
+        "text-embeddings-inference",
+    ),
+    "qwen2.5-vl-7b-instruct-awq": (
+        "Qwen/Qwen2.5-VL-7B-Instruct-AWQ",
+        "safetensors-awq",
+        "Apache-2.0",
+        "vllm",
     ),
 }
 
@@ -157,10 +169,13 @@ def _validate_manifest(data: Mapping[str, Any]) -> ModelBundleManifest:
     if not _IDENTIFIER_PATTERN.fullmatch(manifest.bundle_id):
         raise BundleManifestError("bundle_id contains unsupported characters")
     approved = _APPROVED_MODELS.get(manifest.model_id)
-    if approved != (manifest.repository, manifest.format, manifest.license):
+    if approved != (
+        manifest.repository,
+        manifest.format,
+        manifest.license,
+        manifest.engine,
+    ):
         raise BundleManifestError("model bundle is not approved")
-    if manifest.engine != "text-embeddings-inference":
-        raise BundleManifestError("model bundle engine is not approved")
     if not _REVISION_PATTERN.fullmatch(manifest.revision):
         raise BundleManifestError("revision must be an immutable commit SHA")
     expected_license_url = (
@@ -292,6 +307,9 @@ def download_bundle(
             os.chmod(target, 0o644)
         if not verify_bundle(temporary_path, manifest):
             raise DownloadError("downloaded model bundle failed final verification")
+        # Public model weights must be traversable by the non-root runtime;
+        # staging remains private until every artifact passes verification.
+        os.chmod(temporary_path, 0o755)  # noqa: S103
         os.replace(temporary_path, destination)
         cleanup_path = None
         return destination

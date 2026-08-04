@@ -16,17 +16,32 @@ info() {
   printf 'OK: %s\n' "$1"
 }
 
+read_setting() {
+  setting_name="$1"
+  setting_value="$(printenv "$setting_name" 2>/dev/null || true)"
+  if [ -z "$setting_value" ]; then
+    setting_value="$(
+      sed -n "s/^${setting_name}=//p" .env | tail -n 1 | tr -d '\r'
+    )"
+  fi
+  printf '%s' "$setting_value"
+}
+
 case "$profile" in
   cpu|gpu) ;;
   *) fail "profile must be 'cpu' or 'gpu'" ;;
 esac
 
 [ -f compose.yaml ] && [ -f inference/manifests/tier-s-gemma-3-4b-it-q4_k_m.json ] \
+  && [ -f inference/manifests/tier-m-qwen2.5-vl-7b-instruct-awq.json ] \
   || fail "run preflight from the repository root"
 
 if [ "$profile" = "cpu" ]; then
   required_disk_kb=15728640
   required_disk_gb=15
+else
+  required_disk_kb=31457280
+  required_disk_gb=30
 fi
 
 command -v docker >/dev/null 2>&1 || fail "Docker is not installed"
@@ -91,6 +106,25 @@ if grep -q 'replace-before-production' .env && [ "${environment:-development}" =
 fi
 info "environment file is present"
 
+if [ "$profile" = "gpu" ]; then
+  [ "$(read_setting ARGUS_TIER)" = "M" ] \
+    || fail "GPU profile requires ARGUS_TIER=M"
+  [ "$(read_setting ARGUS_MODEL_PROVIDER)" = "vllm" ] \
+    || fail "GPU profile requires ARGUS_MODEL_PROVIDER=vllm"
+  [ "$(read_setting ARGUS_MODEL_NAME)" = "qwen2.5-vl-7b-instruct-awq" ] \
+    || fail "GPU profile requires the pinned Tier M model name"
+  [ "$(read_setting ARGUS_MODEL_ENDPOINT)" = "http://inference-gpu:8000/v1" ] \
+    || fail "GPU profile requires the internal vLLM endpoint"
+  [ "$(read_setting ARGUS_MODEL_CONTEXT_CEILING)" = "65536" ] \
+    || fail "GPU profile requires the validated 65536-token context ceiling"
+else
+  [ "$(read_setting ARGUS_TIER)" = "S" ] \
+    || fail "CPU profile requires ARGUS_TIER=S"
+  [ "$(read_setting ARGUS_MODEL_PROVIDER)" = "llama_cpp" ] \
+    || fail "CPU profile requires ARGUS_MODEL_PROVIDER=llama_cpp"
+fi
+info "${profile} model adapter configuration is aligned"
+
 if command -v python3 >/dev/null 2>&1; then
   python_command=python3
 elif command -v python >/dev/null 2>&1; then
@@ -106,6 +140,13 @@ if [ "$profile" = "cpu" ]; then
     --verify-only \
     || fail "Tier S model artifact is missing or failed checksum verification"
   info "Tier S model artifact passed checksum verification"
+else
+  "$python_command" -m inference.download_bundle \
+    --manifest inference/manifests/tier-m-qwen2.5-vl-7b-instruct-awq.json \
+    --output-dir models \
+    --verify-only \
+    || fail "Tier M model bundle is missing or failed checksum verification"
+  info "Tier M model bundle passed checksum verification"
 fi
 
 "$python_command" -m inference.download_bundle \
@@ -127,6 +168,13 @@ if [ "$profile" = "gpu" ]; then
   nvidia-smi >/dev/null 2>&1 || fail "NVIDIA driver is not operational"
   docker info --format '{{json .Runtimes}}' | grep -qi nvidia \
     || fail "NVIDIA Container Toolkit runtime is unavailable"
+  gpu_memory_mb="$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits \
+    | awk 'NR == 1 {print int($1)}')"
+  case "$gpu_memory_mb" in
+    ''|*[!0-9]*) fail "could not determine GPU memory" ;;
+  esac
+  [ "$gpu_memory_mb" -ge 23000 ] \
+    || fail "Tier M requires one GPU with at least 24 GB VRAM"
   info "GPU driver and container runtime are available"
 fi
 
