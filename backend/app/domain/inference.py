@@ -6,6 +6,7 @@ from typing import Literal
 
 MessageRole = Literal["system", "user", "assistant"]
 FinishReason = Literal["stop", "length"]
+InferenceOutcome = Literal["success", "failure", "cancelled"]
 EmbeddingKind = Literal["query", "passage"]
 
 
@@ -39,12 +40,21 @@ class GenerationRequest:
 
 
 @dataclass(frozen=True, slots=True)
+class GenerationUsage:
+    """Provider-normalized token accounting for one completed generation."""
+
+    input_tokens: int
+    output_tokens: int
+
+
+@dataclass(frozen=True, slots=True)
 class GenerationChunk:
     """A normalized unit from a streaming model response."""
 
     text: str
     index: int
     finish_reason: FinishReason | None = None
+    usage: GenerationUsage | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +69,28 @@ class ModelCapabilities:
     quantization: str
     speculative_decoding: bool
     prefix_caching: bool
+
+
+@dataclass(frozen=True, slots=True)
+class InferenceMetricDimensions:
+    """Bounded, configuration-derived labels permitted on inference metrics."""
+
+    provider: str
+    model_name: str
+
+
+@dataclass(frozen=True, slots=True)
+class InferenceRequestMetrics:
+    """Content-free measurements emitted when an inference request terminates."""
+
+    outcome: InferenceOutcome
+    total_latency_seconds: float
+    time_to_first_token_seconds: float | None = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    tokens_per_second: float | None = None
+    context_utilization: float | None = None
+    finish_reason: FinishReason | None = None
 
 
 @dataclass(frozen=True, slots=True)

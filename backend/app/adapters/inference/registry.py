@@ -3,9 +3,10 @@
 from collections.abc import Callable
 
 from app.adapters.inference.fake import FakeModelAdapter
+from app.adapters.inference.instrumented import Clock, InstrumentedChatModelAdapter
 from app.adapters.inference.openai_compatible import LlamaCppAdapter, VllmOpenAIAdapter
 from app.core.config import Settings
-from app.ports.inference import ChatModelPort
+from app.ports.inference import ChatModelPort, InferenceMetricsPort
 
 ModelFactory = Callable[[Settings], ChatModelPort]
 
@@ -17,9 +18,16 @@ class ModelAdapterUnavailableError(RuntimeError):
 class ModelAdapterRegistry:
     """Resolve and cache process-level adapters by provider configuration."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        metrics: InferenceMetricsPort | None = None,
+        *,
+        clock: Clock | None = None,
+    ) -> None:
         self._factories: dict[str, ModelFactory] = {}
         self._instances: dict[tuple[str, str, str, int], ChatModelPort] = {}
+        self._metrics = metrics
+        self._clock = clock
 
     def register(self, provider: str, factory: ModelFactory) -> None:
         """Register one provider factory."""
@@ -43,14 +51,25 @@ class ModelAdapterRegistry:
             raise ModelAdapterUnavailableError("Configured local model provider is unavailable.")
 
         adapter = factory(settings)
+        if self._metrics is not None:
+            decorator_options = {"clock": self._clock} if self._clock is not None else {}
+            adapter = InstrumentedChatModelAdapter(
+                adapter,
+                self._metrics,
+                **decorator_options,
+            )
         self._instances[key] = adapter
         return adapter
 
 
-def create_default_registry() -> ModelAdapterRegistry:
+def create_default_registry(
+    metrics: InferenceMetricsPort | None = None,
+    *,
+    clock: Clock | None = None,
+) -> ModelAdapterRegistry:
     """Create the registry for deterministic and deployment-local engines."""
 
-    registry = ModelAdapterRegistry()
+    registry = ModelAdapterRegistry(metrics, clock=clock)
     registry.register(
         "fake",
         lambda settings: FakeModelAdapter(

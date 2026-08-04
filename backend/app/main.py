@@ -2,12 +2,16 @@
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_client import CollectorRegistry
 
+from app.adapters.inference.metrics import NoOpInferenceMetrics, PrometheusInferenceMetrics
 from app.adapters.inference.registry import ModelAdapterRegistry, create_default_registry
 from app.api.routes.debug import router as debug_router
 from app.api.routes.health import router as health_router
+from app.api.routes.metrics import router as metrics_router
 from app.core.config import Settings, get_settings
 from app.core.http import SecurityHeadersMiddleware
+from app.ports.inference import InferenceMetricsPort
 
 
 def create_app(
@@ -17,6 +21,12 @@ def create_app(
     """Build an application instance with explicit dependencies."""
 
     active_settings = settings or get_settings()
+    prometheus_registry = CollectorRegistry(auto_describe=True)
+    metrics: InferenceMetricsPort = (
+        PrometheusInferenceMetrics(prometheus_registry)
+        if active_settings.inference_metrics_enabled
+        else NoOpInferenceMetrics()
+    )
     application = FastAPI(
         title="Argus Panopt API",
         summary="Self-hosted document intelligence API",
@@ -36,9 +46,11 @@ def create_app(
             return active_settings
 
         application.dependency_overrides[get_settings] = settings_override
-    application.state.model_registry = model_registry or create_default_registry()
+    application.state.prometheus_registry = prometheus_registry
+    application.state.model_registry = model_registry or create_default_registry(metrics)
     application.include_router(health_router)
     application.include_router(debug_router)
+    application.include_router(metrics_router)
     return application
 
 

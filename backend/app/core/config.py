@@ -23,8 +23,14 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO", pattern=r"^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$")
     cors_origins: str = "http://localhost:8080"
     debug_inference_enabled: bool = False
+    inference_metrics_enabled: bool = True
     model_provider: str = Field(default="llama_cpp", pattern=r"^(fake|llama_cpp|vllm)$")
-    model_name: str = "local-model-not-downloaded"
+    model_name: str = Field(
+        default="local-model-not-downloaded",
+        min_length=1,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._/-]*$",
+    )
     model_endpoint: str = "http://inference-cpu:8080/v1"
     model_context_ceiling: int = Field(default=32_768, ge=1024, le=131_072)
     embedding_endpoint: str = "http://embedding-service:8081"

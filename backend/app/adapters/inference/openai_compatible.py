@@ -7,7 +7,13 @@ from typing import Any
 
 import httpx
 
-from app.domain.inference import GenerationChunk, GenerationRequest, ModelCapabilities
+from app.domain.inference import (
+    FinishReason,
+    GenerationChunk,
+    GenerationRequest,
+    GenerationUsage,
+    ModelCapabilities,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -120,6 +126,7 @@ class OpenAICompatibleChatAdapter:
             "max_tokens": request.max_tokens,
             "temperature": request.temperature,
             "stream": True,
+            "stream_options": {"include_usage": True},
         }
         if request.stop:
             payload["stop"] = list(request.stop)
@@ -127,7 +134,9 @@ class OpenAICompatibleChatAdapter:
 
     async def _chunks(self, response: httpx.Response) -> AsyncIterator[GenerationChunk]:
         index = 0
-        finished = False
+        finish_reason: FinishReason | None = None
+        usage: GenerationUsage | None = None
+        terminal_emitted = False
         async for line in response.aiter_lines():
             if not line or line.startswith(":") or line.startswith("event:"):
                 continue
@@ -138,11 +147,41 @@ class OpenAICompatibleChatAdapter:
 
             data = line.removeprefix("data:").strip()
             if data == "[DONE]":
-                if not finished:
-                    yield GenerationChunk(text="", index=index, finish_reason="stop")
+                if not terminal_emitted:
+                    yield GenerationChunk(
+                        text="",
+                        index=index,
+                        finish_reason=finish_reason or "stop",
+                        usage=usage,
+                    )
                 return
 
-            choice = self._first_choice(data)
+            payload = self._event_payload(data)
+            usage_in_event = payload.get("usage") is not None
+            if usage_in_event:
+                usage = self._usage(payload["usage"])
+
+            choices = payload.get("choices")
+            if not isinstance(choices, list):
+                raise ModelProtocolError(
+                    "Local inference service returned an invalid event stream."
+                )
+            if not choices:
+                if not usage_in_event:
+                    raise ModelProtocolError(
+                        "Local inference service returned an invalid event stream."
+                    )
+                if finish_reason is not None and not terminal_emitted:
+                    yield GenerationChunk(
+                        text="",
+                        index=index,
+                        finish_reason=finish_reason,
+                        usage=usage,
+                    )
+                    terminal_emitted = True
+                continue
+
+            choice = self._first_choice(choices)
             delta = choice.get("delta")
             if delta is not None and not isinstance(delta, dict):
                 raise ModelProtocolError(
@@ -158,20 +197,35 @@ class OpenAICompatibleChatAdapter:
                 yield GenerationChunk(text=content, index=index)
                 index += 1
 
-            finish_reason = choice.get("finish_reason")
-            if finish_reason is not None:
-                if finish_reason not in {"stop", "length"}:
+            event_finish_reason = choice.get("finish_reason")
+            if event_finish_reason is not None:
+                if event_finish_reason not in {"stop", "length"}:
                     raise ModelProtocolError(
                         "Local inference service returned an unsupported finish reason."
                     )
-                yield GenerationChunk(text="", index=index, finish_reason=finish_reason)
-                finished = True
+                finish_reason = event_finish_reason
+                if usage_in_event and usage is not None:
+                    yield GenerationChunk(
+                        text="",
+                        index=index,
+                        finish_reason=finish_reason,
+                        usage=usage,
+                    )
+                    terminal_emitted = True
 
-        if not finished:
+        if finish_reason is not None and not terminal_emitted:
+            yield GenerationChunk(
+                text="",
+                index=index,
+                finish_reason=finish_reason,
+                usage=usage,
+            )
+            return
+        if not terminal_emitted:
             raise ModelProtocolError("Local inference service ended an incomplete event stream.")
 
     @staticmethod
-    def _first_choice(data: str) -> dict[str, Any]:
+    def _event_payload(data: str) -> dict[str, Any]:
         try:
             payload = json.loads(data)
         except json.JSONDecodeError as error:
@@ -180,17 +234,34 @@ class OpenAICompatibleChatAdapter:
             ) from error
         if not isinstance(payload, dict):
             raise ModelProtocolError("Local inference service returned an invalid event stream.")
+        return payload
 
-        choices = payload.get("choices")
-        if not isinstance(choices, list):
-            raise ModelProtocolError("Local inference service returned an invalid event stream.")
-        if not choices:
-            raise ModelProtocolError("Local inference service returned an invalid event stream.")
-
+    @staticmethod
+    def _first_choice(choices: list[Any]) -> dict[str, Any]:
         choice = choices[0]
         if not isinstance(choice, dict):
             raise ModelProtocolError("Local inference service returned an invalid event stream.")
         return choice
+
+    @staticmethod
+    def _usage(value: Any) -> GenerationUsage:
+        if not isinstance(value, dict):
+            raise ModelProtocolError("Local inference service returned invalid usage data.")
+        input_tokens = value.get("prompt_tokens")
+        output_tokens = value.get("completion_tokens")
+        total_tokens = value.get("total_tokens")
+        if (
+            type(input_tokens) is not int
+            or input_tokens < 0
+            or type(output_tokens) is not int
+            or output_tokens < 0
+            or (
+                total_tokens is not None
+                and (type(total_tokens) is not int or total_tokens != input_tokens + output_tokens)
+            )
+        ):
+            raise ModelProtocolError("Local inference service returned invalid usage data.")
+        return GenerationUsage(input_tokens=input_tokens, output_tokens=output_tokens)
 
 
 class LlamaCppAdapter(OpenAICompatibleChatAdapter):

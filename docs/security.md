@@ -22,6 +22,7 @@ operator administration plane. Only the reverse proxy is externally reachable.
 | Document text attempts prompt injection | Tampering / elevation | Retrieved text is untrusted data, versioned system templates, instruction neutralization, no model-triggered tools, structured citation metadata | Adversarial golden cases in Phase 3 |
 | User denies upload, query, or deletion | Repudiation | Append-only metadata audit log with actor, IP, outcome, request ID, masked or hashed query | Audit completeness tests in Phase 5 |
 | Raw content appears in logs or traces | Information disclosure | Structured logs, metadata-only INFO events, error redaction, PII masking, configurable trace retention | Log-capture and trace-masking tests |
+| Raw content appears in metric labels | Information disclosure | Port-level telemetry decorator, fixed label schema, configured model-name validation, content-free Prometheus adapter, private scrape path | Metric exposition and proxy-denial tests |
 | Cache or vector leaks across tenants | Information disclosure | Project and user scoped cache keys, project predicates, corpus-version invalidation, no shared semantic cache | Negative cache and retrieval tests |
 | Token or secret exposed in image/source | Information disclosure | Docker secrets support, ignored local env, gitleaks, least-privilege service identities | CI secret scan and image inspection |
 | Container reaches an outside host | Information disclosure | Internal processing network, no published processing ports, egress test | `scripts/check_processing_egress.sh` |
@@ -77,6 +78,13 @@ operator administration plane. Only the reverse proxy is externally reachable.
   contexts, prompts, expected answers, or generated text.
 - The evaluation HTTP runner accepts deployment-local endpoints only and
   disables redirects and inherited proxy settings.
+- Inference metrics are emitted through a provider-neutral decorator. Metric
+  labels are restricted to fixed providers, validated configured model names,
+  bounded outcomes, and bounded finish reasons. Prompts, outputs, request
+  metadata, document/user identifiers, and exception text are excluded.
+  Metrics use provider-reported token usage when available and never estimate
+  it from PHI-bearing text. The scrape path is omitted from OpenAPI, reachable
+  only on the internal API service, and explicitly denied by the web proxy.
 
 ## Required design rules for future phases
 

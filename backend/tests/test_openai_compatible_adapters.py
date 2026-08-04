@@ -61,7 +61,7 @@ def test_local_adapters_translate_and_normalize_streams(
             headers={"content-type": "text/event-stream"},
             stream=StubEventStream(
                 [
-                    b'data: {"choices":[{"delta":{"role":"assistant"}}]}\n\n',
+                    b'data: {"choices":[{"delta":{"role":"assistant"}}],"usage":null}\n\n',
                     b'data: {"choices":[{"delta":{"content":"local "}}]}\n\n',
                     b'data: {"choices":[{"delta":{"content":"answer"}}]}\n\n',
                     b'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n',
@@ -93,6 +93,7 @@ def test_local_adapters_translate_and_normalize_streams(
         "max_tokens": 64,
         "temperature": 0.2,
         "stream": True,
+        "stream_options": {"include_usage": True},
         "stop": ["</answer>"],
     }
     assert "".join(chunk.text for chunk in chunks) == "local answer"
@@ -101,6 +102,72 @@ def test_local_adapters_translate_and_normalize_streams(
     assert capabilities.provider == provider
     assert capabilities.quantization == quantization
     assert capabilities.vision is vision
+
+
+@pytest.mark.parametrize("adapter_type", [LlamaCppAdapter, VllmOpenAIAdapter])
+def test_local_adapters_normalize_final_stream_usage(adapter_type: AdapterType) -> None:
+    def handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            stream=StubEventStream(
+                [
+                    b'data: {"choices":[{"delta":{"content":"answer"}}]}\n\n',
+                    b'data: {"choices":[{"delta":{},"finish_reason":"length"}]}\n\n',
+                    b'data: {"choices":[],"usage":{"prompt_tokens":7,'
+                    b'"completion_tokens":3,"total_tokens":10}}\n\n',
+                    b"data: [DONE]\n\n",
+                ]
+            ),
+        )
+
+    async def collect() -> list[GenerationChunk]:
+        adapter = adapter_type(
+            endpoint="http://inference-engine:8080/v1",
+            model_name="local-test-model",
+            max_context=4096,
+            transport=httpx.MockTransport(handler),
+        )
+        stream = await adapter.generate(_request())
+        return [chunk async for chunk in stream]
+
+    chunks = asyncio.run(collect())
+
+    assert chunks[-1].finish_reason == "length"
+    assert chunks[-1].usage is not None
+    assert chunks[-1].usage.input_tokens == 7
+    assert chunks[-1].usage.output_tokens == 3
+
+
+@pytest.mark.parametrize(
+    "usage",
+    [
+        None,
+        {"prompt_tokens": -1, "completion_tokens": 2},
+        {"prompt_tokens": 1, "completion_tokens": "private-output"},
+        {"prompt_tokens": 1, "completion_tokens": 2, "total_tokens": 99},
+    ],
+)
+def test_adapter_rejects_invalid_usage_without_echoing_values(usage: object) -> None:
+    event = json.dumps({"choices": [], "usage": usage}).encode()
+
+    def handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, stream=StubEventStream([b"data: " + event + b"\n\n"]))
+
+    async def collect() -> None:
+        adapter = LlamaCppAdapter(
+            endpoint="http://inference-cpu:8080/v1",
+            model_name="local-test-model",
+            max_context=4096,
+            transport=httpx.MockTransport(handler),
+        )
+        stream = await adapter.generate(_request())
+        async for _ in stream:
+            pass
+
+    with pytest.raises(ModelProtocolError) as caught:
+        asyncio.run(collect())
+
+    assert "private-output" not in str(caught.value)
 
 
 @pytest.mark.parametrize(
