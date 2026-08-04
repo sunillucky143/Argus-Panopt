@@ -3,7 +3,7 @@
 | Phase | Scope | Exit evidence |
 | --- | --- | --- |
 | 0 | Monorepo, API/web shell, Compose profiles, CI, ADR and threat model | CPU profile health, lint/type/unit/build/security green |
-| 1 | Local model adapters, embeddings/reranking, 20-case eval seed | Streaming debug endpoint, adapter contracts, and seed evaluation report |
+| 1 | Local model adapters, embeddings/reranking, 20-case eval seed, safe telemetry contracts | Streaming debug endpoint, adapter contracts, seed evaluation report, standardized metrics, and PHI-safe spans |
 | 2 | Sandboxed ingestion and status stream | PDF/DOCX/XLSX and malicious-file integration suite |
 | 3 | Hybrid RAG, citations, refusal, cache, model bake-off | 50+ case eval report and scoped-cache tests |
 | 4 | Streaming project/chat/document UI | CPU-profile Playwright and accessibility suite |

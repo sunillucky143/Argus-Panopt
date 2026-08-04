@@ -59,8 +59,33 @@ flowchart LR
 
 Phase 0 provisions the web, API, PostgreSQL, and Redis boundaries. Phase 1 adds
 isolated llama.cpp CPU and vLLM GPU runtimes behind the provider-neutral model
-adapter, plus the internal BGE retrieval gateway and workers. Later phases fill
-the remaining reserved service locations.
+adapter, the internal BGE retrieval gateway and workers, and provider-neutral
+inference instrumentation. Later phases fill the remaining reserved service
+locations.
+
+## Inference telemetry boundary
+
+```mermaid
+flowchart LR
+  API["API and future RAG use cases"] --> Decorator["Instrumented ChatModelPort"]
+  Decorator --> Adapter["Fake, llama.cpp, or vLLM adapter"]
+  Decorator --> MetricsPort["InferenceMetricsPort"]
+  MetricsPort --> Prometheus["Private Prometheus registry"]
+  Scraper["Internal scraper (Phase 6)"] -->|"GET /internal/metrics"| Prometheus
+```
+
+The decorator measures every configured chat provider through one domain
+contract. Terminal chunks may carry normalized input/output token usage, while
+provider payloads remain inside infrastructure adapters. Only the fixed
+provider set, a validated configured model name, bounded outcomes, and bounded
+finish reasons can become metric labels. Prompts, outputs, request metadata,
+document identifiers, user identifiers, and exception messages never enter the
+metrics port.
+
+The API owns a private Prometheus registry and exposes it only at the backend's
+`/internal/metrics` path. The backend has no published host port, and the web
+proxy denies the entire `/api/internal/` namespace. Prometheus/Grafana service
+provisioning and dashboards remain Phase 6 work.
 
 ## Data lifecycle
 

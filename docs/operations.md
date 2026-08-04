@@ -71,6 +71,26 @@ artifacts after ordinary failures, and reports any cleanup failure.
 Never place PHI or secrets in command history, tickets, screenshots, or support
 bundles.
 
+## Inference metrics
+
+Inference metrics are enabled by default with
+`ARGUS_INFERENCE_METRICS_ENABLED=true`. An internal Prometheus scraper may read
+`http://api:8000/internal/metrics` from the processing network. The web proxy
+denies `/api/internal/`, and operators must not add a host port or public proxy
+route for the scrape endpoint.
+
+The Phase 1 metrics contract emits request, failure, cancellation, finish
+reason, time-to-first-token, total latency, provider-reported input/output token
+count, token throughput, and context-utilization measurements. Token-derived
+series are omitted for a request when the local engine does not return valid
+usage data. Do not add prompt text, generated text, request metadata, document
+IDs, user IDs, URLs, exception messages, or any other free-form value as a
+label. Set `ARGUS_INFERENCE_METRICS_ENABLED=false` only when a deployment
+requires the no-op adapter; the endpoint then returns 404.
+
+Prometheus/Grafana containers, dashboards, alerts, and retention policy remain
+Phase 6 work.
+
 ## Backup (implemented in Phase 7)
 
 The supported backup set will contain an encrypted PostgreSQL logical backup,

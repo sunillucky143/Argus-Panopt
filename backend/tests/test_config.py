@@ -37,3 +37,12 @@ def test_local_model_endpoints_are_accepted(endpoint: str) -> None:
 def test_non_local_model_endpoints_are_rejected(endpoint: str) -> None:
     with pytest.raises(ValidationError, match="model endpoint"):
         Settings(model_endpoint=endpoint)
+
+
+@pytest.mark.parametrize(
+    "model_name",
+    ["", "private model", "model\ncontent", "x" * 129],
+)
+def test_unbounded_model_metric_labels_are_rejected(model_name: str) -> None:
+    with pytest.raises(ValidationError):
+        Settings(model_name=model_name)

@@ -2,7 +2,12 @@
 
 from collections.abc import AsyncIterator
 
-from app.domain.inference import GenerationChunk, GenerationRequest, ModelCapabilities
+from app.domain.inference import (
+    GenerationChunk,
+    GenerationRequest,
+    GenerationUsage,
+    ModelCapabilities,
+)
 
 
 class FakeModelAdapter:
@@ -36,7 +41,12 @@ class FakeModelAdapter:
             for index, word in enumerate(words):
                 suffix = "" if index == len(words) - 1 else " "
                 yield GenerationChunk(text=f"{word}{suffix}", index=index)
-            yield GenerationChunk(text="", index=len(words), finish_reason="stop")
+            yield GenerationChunk(
+                text="",
+                index=len(words),
+                finish_reason="stop",
+                usage=GenerationUsage(input_tokens=0, output_tokens=len(words)),
+            )
 
         return stream()
 

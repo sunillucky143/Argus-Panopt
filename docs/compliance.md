@@ -17,7 +17,7 @@ physical safeguards, and correct configuration.
 | HIPAA person/entity authentication, 164.312(d) | Standards-based OIDC validation through Keycloak | Phase 5 token tests |
 | HIPAA transmission security, 164.312(e)(1) | TLS/HSTS at ingress; isolated internal networks; processing egress denial | TLS review and egress test |
 | SOC 2 CC6 logical access | RBAC, secrets handling, network segmentation, reviewed administration | Phases 5 and 7 |
-| SOC 2 CC7 monitoring and response | Structured security events, Prometheus alerts, incident runbook | Phase 6 dashboards and drills |
+| SOC 2 CC7 monitoring and response | Content-free inference metrics, structured security events, Prometheus alerts, incident runbook | Phase 1 metric-contract tests; Phase 6 dashboards and drills |
 | SOC 2 CC8 change management | Protected main, small PRs, required CI, ADRs, release SBOM | Repository rules and CI evidence |
 | SOC 2 CC9 risk mitigation | STRIDE model, dependency/image scans, backup/restore rehearsal | CI and Phase 7 evidence |
 
@@ -29,5 +29,16 @@ physical safeguards, and correct configuration.
 - Reproducible dependencies: `backend/uv.lock`, `frontend/package-lock.json`
 - Security gates: `.github/workflows/ci.yml`
 - Threat analysis: `docs/security.md`
+
+## Phase 1 telemetry evidence
+
+- Provider-neutral lifecycle instrumentation:
+  `backend/tests/test_inference_metrics.py`
+- Content-free bounded labels and private scrape route:
+  `backend/tests/test_inference_metrics.py`
+- Local-engine usage normalization and safe protocol failures:
+  `backend/tests/test_openai_compatible_adapters.py`
+- Telemetry architecture decision:
+  `docs/adr/0004-provider-neutral-inference-metrics.md`
 
 Mappings must be updated in the same PR as any control-affecting feature.

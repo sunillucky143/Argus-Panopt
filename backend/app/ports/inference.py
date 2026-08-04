@@ -8,12 +8,28 @@ from app.domain.inference import (
     GenerationChunk,
     GenerationRequest,
     ImageRef,
+    InferenceMetricDimensions,
+    InferenceRequestMetrics,
     ModelCapabilities,
     Passage,
     ScoredPassage,
     Vector,
     VisionResult,
 )
+
+
+class InferenceMetricsPort(Protocol):
+    """Content-free metrics boundary for streaming generation."""
+
+    def request_started(self, dimensions: InferenceMetricDimensions) -> None:
+        """Count one generation request using only bounded configured labels."""
+
+    def request_finished(
+        self,
+        dimensions: InferenceMetricDimensions,
+        metrics: InferenceRequestMetrics,
+    ) -> None:
+        """Record terminal timings and token usage without request content."""
 
 
 class ChatModelPort(Protocol):

@@ -6,8 +6,8 @@ inference are designed to remain inside the operator's deployment.
 
 This repository contains the Phase 0 production foundation and active **Phase 1**
 inference work: provider-neutral model ports, local streaming adapters, model-aware
-readiness, a 20-case synthetic evaluation harness, hardened Compose profiles,
-and CI/security gates.
+readiness, standardized content-free inference metrics, a 20-case synthetic
+evaluation harness, hardened Compose profiles, and CI/security gates.
 
 ## Prerequisites
 
