@@ -61,6 +61,22 @@ python -m unittest discover -s inference/tests -v
 When updating a model, add a new manifest after separately confirming the
 immutable upstream revision, exact byte size, license, and SHA-256. Do not edit
 an existing manifest in place for a different artifact.
+## Local retrieval runtime
+
+The Compose `cpu` and `gpu` profiles mount the exact BGE bundle IDs above
+into separate, digest-pinned Text Embeddings Inference 1.9.1 CPU workers.
+Workers run in forced offline mode and receive only a read-only
+`/models/model` mount on the internal processing network. The
+`embedding-service` gateway preserves the provider-neutral Argus contracts
+while translating requests to TEI's `/embed` and `/rerank` endpoints.
+
+Before either real-model profile starts, `deploy/preflight.sh` verifies every
+bundle file's name, byte count, and SHA-256. CI renders the real profile and
+enforces the image digest, local command, exact mount source, offline
+environment, network isolation, non-root identity, read-only filesystem, and
+resource ceilings. The pinned TEI CPU image currently requires `linux/amd64`.
+
+
 
 ## llama.cpp CPU runtime
 

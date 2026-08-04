@@ -1,7 +1,8 @@
 # Embedding service
 
-Phase 1 adds the dedicated, CPU-hosted BGE-M3 embedding and reranking service
-here. It will have no external network route.
+Phase 1 provides a dedicated local BGE-M3 embedding and reranking runtime.
+All three retrieval containers have only the internal processing-network route;
+the service never sends document text to an external endpoint.
 
 ## Internal adapter contract
 
@@ -50,8 +51,22 @@ Both contracts are bounded to 256 inputs of at most 32,768 characters each.
 Model identifiers must match configuration exactly. Transport and protocol
 errors are generic and never include input text or service response bodies.
 
-The BGE-M3 ONNX and bge-reranker-v2-m3 safetensors snapshots now have
-immutable, checksum-pinned bundle manifests and an offline-verifiable
-provisioner. The next work item mounts those bundles into the isolated CPU
-runtime behind this contract. Until then, the adapters remain contract-tested
-with an in-memory HTTP transport and are not wired into application paths.
+## Local runtime topology
+
+The Compose `cpu` and `gpu` profiles start this FastAPI contract gateway and
+two Text Embeddings Inference 1.9.1 CPU workers. The gateway translates only to
+the workers' local `/embed` and `/rerank` endpoints. It disables redirects,
+environment proxies, API documentation, and access logs; it caps inputs,
+responses, vector dimensions, and timeouts; and it replaces validation,
+transport, and protocol failures with content-safe messages.
+
+Both workers use one digest-pinned TEI image and run as UID/GID 10001 with a
+read-only root filesystem, all capabilities dropped, no-new-privileges, bounded
+tmpfs/PIDs/CPU/RAM, no host ports, and only the internal processing network.
+`HF_HUB_OFFLINE=1` prevents registry access. Each worker receives exactly one
+checksum-verified bundle directory at `/models/model` as a read-only mount.
+
+`GET /health/live` reports gateway process liveness. `GET /health/ready`
+returns HTTP 200 only when both TEI workers report healthy; otherwise it returns
+HTTP 503 without exposing worker details. TEI's supported CPU image is pinned to
+`linux/amd64`; deploy this profile on an AMD64 host.

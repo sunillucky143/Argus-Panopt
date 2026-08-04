@@ -165,6 +165,123 @@ services:
     mem_limit: ${ARGUS_LLAMA_MEMORY:-8g}
     pids_limit: 512
 
+  embedding-service:
+    <<: *hardened
+    profiles: ["cpu", "gpu"]
+    build:
+      context: ../embedding-service
+    user: "10001:10001"
+    environment:
+      ARGUS_RETRIEVAL_EMBEDDING_ENGINE_ENDPOINT: http://embedding-engine:80
+      ARGUS_RETRIEVAL_RERANKER_ENGINE_ENDPOINT: http://reranker-engine:80
+      ARGUS_RETRIEVAL_EMBEDDING_MODEL: ${ARGUS_EMBEDDING_MODEL:-bge-m3}
+      ARGUS_RETRIEVAL_RERANKER_MODEL: ${ARGUS_RERANKER_MODEL:-bge-reranker-v2-m3}
+      ARGUS_RETRIEVAL_TIMEOUT_SECONDS: ${ARGUS_RETRIEVAL_TIMEOUT_SECONDS:-120}
+    depends_on:
+      embedding-engine:
+        condition: service_healthy
+      reranker-engine:
+        condition: service_healthy
+    networks:
+      - processing
+    tmpfs:
+      - /tmp:size=64m,mode=1770,uid=10001,gid=10001
+    cpus: ${ARGUS_RETRIEVAL_GATEWAY_CPUS:-0.5}
+    mem_limit: ${ARGUS_RETRIEVAL_GATEWAY_MEMORY:-256m}
+    pids_limit: 64
+
+  embedding-engine:
+    <<: *hardened
+    profiles: ["cpu", "gpu"]
+    platform: linux/amd64
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.9.1@sha256:b7772cdd9dcbced147b16a7dff17d4aed1ab36333f8d3e686c50d2175e1d2126
+    user: "10001:10001"
+    command:
+      - --model-id
+      - /models/model
+      - --port
+      - "80"
+      - --dtype
+      - float32
+      - --pooling
+      - cls
+      - --max-client-batch-size
+      - "256"
+      - --max-batch-tokens
+      - "16384"
+      - --auto-truncate
+    environment:
+      HOME: /tmp
+      HF_HOME: /tmp/huggingface
+      HF_HUB_CACHE: /tmp/huggingface
+      HF_HUB_OFFLINE: "1"
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      RAYON_NUM_THREADS: ${ARGUS_EMBEDDING_THREADS:-4}
+    volumes:
+      - type: bind
+        source: ../models/bge-m3-onnx-fp32-5617a9f
+        target: /models/model
+        read_only: true
+    networks:
+      - processing
+    tmpfs:
+      - /tmp:size=256m,mode=1770,uid=10001,gid=10001
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://127.0.0.1:80/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 180s
+    stop_grace_period: 30s
+    cpus: ${ARGUS_EMBEDDING_CPUS:-2.0}
+    mem_limit: ${ARGUS_EMBEDDING_MEMORY:-4g}
+    pids_limit: 256
+
+  reranker-engine:
+    <<: *hardened
+    profiles: ["cpu", "gpu"]
+    platform: linux/amd64
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.9.1@sha256:b7772cdd9dcbced147b16a7dff17d4aed1ab36333f8d3e686c50d2175e1d2126
+    user: "10001:10001"
+    command:
+      - --model-id
+      - /models/model
+      - --port
+      - "80"
+      - --dtype
+      - float32
+      - --max-client-batch-size
+      - "256"
+      - --max-batch-tokens
+      - "16384"
+      - --auto-truncate
+    environment:
+      HOME: /tmp
+      HF_HOME: /tmp/huggingface
+      HF_HUB_CACHE: /tmp/huggingface
+      HF_HUB_OFFLINE: "1"
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      RAYON_NUM_THREADS: ${ARGUS_RERANKER_THREADS:-4}
+    volumes:
+      - type: bind
+        source: ../models/bge-reranker-v2-m3-safetensors-fp32-953dc6f
+        target: /models/model
+        read_only: true
+    networks:
+      - processing
+    tmpfs:
+      - /tmp:size=256m,mode=1770,uid=10001,gid=10001
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://127.0.0.1:80/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 180s
+    stop_grace_period: 30s
+    cpus: ${ARGUS_RERANKER_CPUS:-2.0}
+    mem_limit: ${ARGUS_RERANKER_MEMORY:-4g}
+    pids_limit: 256
+
 networks:
   edge:
     driver: bridge

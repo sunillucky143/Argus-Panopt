@@ -45,6 +45,25 @@ jobs:
       - run: uv run mypy app tests
       - run: uv run pytest
 
+  retrieval:
+    name: Retrieval gateway quality and unit tests
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: embedding-service
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.9.13"
+          enable-cache: true
+      - run: uv sync --frozen --all-groups
+      - run: uv run black --check .
+      - run: uv run ruff check .
+      - run: uv run mypy app tests
+      - run: uv run pytest
+
+
   frontend:
     name: Frontend quality and unit tests
     runs-on: ubuntu-24.04
@@ -77,10 +96,15 @@ jobs:
           uv sync --frozen --all-groups
           uv run bandit -c pyproject.toml -r app
           uv run pip-audit
+      - working-directory: embedding-service
+        run: |
+          uv sync --frozen --all-groups
+          uv run bandit -c pyproject.toml -r app
+          uv run pip-audit
       - working-directory: frontend
         run: npm audit --audit-level=critical
       - name: Semgrep
-        run: uvx semgrep scan --config p/python --error backend/app
+        run: uvx semgrep scan --config p/python --error backend/app embedding-service/app
       - uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -104,7 +128,8 @@ jobs:
       - run: sh deploy/init-secrets.sh
       - run: docker compose --profile cpu config --quiet
       - run: python scripts/check_model_runtime_policy.py
-      - run: docker compose --profile cpu pull inference-cpu
+      - run: docker compose --profile cpu pull inference-cpu embedding-engine
+      - run: docker build embedding-service
       - run: docker compose --profile smoke build
       - name: Start deterministic smoke stack
         env:

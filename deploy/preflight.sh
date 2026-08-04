@@ -91,14 +91,15 @@ if grep -q 'replace-before-production' .env && [ "${environment:-development}" =
 fi
 info "environment file is present"
 
+if command -v python3 >/dev/null 2>&1; then
+  python_command=python3
+elif command -v python >/dev/null 2>&1; then
+  python_command=python
+else
+  fail "Python is required to verify local model artifacts"
+fi
+
 if [ "$profile" = "cpu" ]; then
-  if command -v python3 >/dev/null 2>&1; then
-    python_command=python3
-  elif command -v python >/dev/null 2>&1; then
-    python_command=python
-  else
-    fail "Python is required to verify the Tier S model artifact"
-  fi
   "$python_command" -m inference.download_model \
     --manifest inference/manifests/tier-s-gemma-3-4b-it-q4_k_m.json \
     --output-dir models \
@@ -106,6 +107,20 @@ if [ "$profile" = "cpu" ]; then
     || fail "Tier S model artifact is missing or failed checksum verification"
   info "Tier S model artifact passed checksum verification"
 fi
+
+"$python_command" -m inference.download_bundle \
+  --manifest inference/manifests/bge-m3-onnx-fp32.json \
+  --output-dir models \
+  --verify-only \
+  || fail "BGE-M3 bundle is missing or failed checksum verification"
+info "BGE-M3 bundle passed checksum verification"
+
+"$python_command" -m inference.download_bundle \
+  --manifest inference/manifests/bge-reranker-v2-m3-safetensors-fp32.json \
+  --output-dir models \
+  --verify-only \
+  || fail "BGE reranker bundle is missing or failed checksum verification"
+info "BGE reranker bundle passed checksum verification"
 
 if [ "$profile" = "gpu" ]; then
   command -v nvidia-smi >/dev/null 2>&1 || fail "nvidia-smi is unavailable"
