@@ -116,6 +116,13 @@ def evaluate(dataset: EvalDataset, runner: Runner) -> EvaluationReport:
     passed = sum(result.status == "passed" for result in results)
     errors = sum(result.status == "error" for result in results)
     measured = [result for result in results if result.status != "error"]
+    if measured:
+        exact_match_rate = round(sum(result.exact_match for result in measured) / len(measured), 3)
+        average_coverage = round(
+            sum(result.required_term_coverage for result in measured) / len(measured), 3
+        )
+    else:
+        exact_match_rate = average_coverage = 0.0
     return EvaluationReport(
         schema_version=1,
         dataset_id=dataset.identifier,
@@ -126,15 +133,8 @@ def evaluate(dataset: EvalDataset, runner: Runner) -> EvaluationReport:
         passed_cases=passed,
         failed_cases=len(results) - passed - errors,
         error_cases=errors,
-        exact_match_rate=round(sum(result.exact_match for result in measured) / len(measured), 3)
-        if measured
-        else 0.0,
-        average_required_term_coverage=round(
-            sum(result.required_term_coverage for result in measured) / len(measured),
-            3,
-        )
-        if measured
-        else 0.0,
+        exact_match_rate=exact_match_rate,
+        average_required_term_coverage=average_coverage,
         average_ttft_ms=_average(
             [result.ttft_ms for result in measured if result.ttft_ms is not None]
         ),

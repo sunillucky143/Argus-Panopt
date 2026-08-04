@@ -30,6 +30,14 @@ class _PartialRunner:
         )
 
 
+class _ErrorRunner:
+    name = "error"
+
+    def generate(self, dataset: EvalDataset, case: EvalCase) -> GenerationResult:
+        del dataset, case
+        raise EvaluationError("content-safe failure")
+
+
 def test_fixture_report_passes_and_excludes_all_content(tmp_path: Path) -> None:
     result = main(
         [
@@ -71,6 +79,16 @@ def test_report_records_failures_and_errors_without_error_details() -> None:
     assert report.cases[1].status == "failed"
     assert report.cases[1].response_sha256 is not None
     assert report.average_latency_ms == 2.346
+
+
+def test_all_error_cases_produce_zero_rates_without_crashing() -> None:
+    report = evaluate(_DATASET, _ErrorRunner())
+
+    assert report.error_cases == report.total_cases == 20
+    assert report.failed_cases == 0
+    assert report.exact_match_rate == 0.0
+    assert report.average_required_term_coverage == 0.0
+    assert report.average_latency_ms is None
 
 
 def test_required_term_matching_uses_phrase_boundaries() -> None:
