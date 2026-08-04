@@ -59,6 +59,12 @@ operator administration plane. Only the reverse proxy is externally reachable.
   read-only root filesystem, dropped capabilities, resource ceilings, no host
   port, and only the internal processing network. CI validates the rendered
   policy and CI probes egress from the model image on its actual network policy.
+- The retrieval gateway and both TEI workers use the same internal-only
+  processing network and publish no ports. TEI runs from a digest-pinned image
+  in forced offline mode with exact read-only verified bundle mounts. The
+  gateway disables redirects and proxy inheritance, bounds requests and
+  responses, validates finite and complete results, suppresses access logs, and
+  emits only generic content-safe failures.
 - INFO logging of document text and prompts is prohibited by policy and review.
 
 ## Required design rules for future phases

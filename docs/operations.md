@@ -46,11 +46,14 @@ artifacts after ordinary failures, and reports any cleanup failure.
    restrict file permissions to the deployment account.
 3. Terminate TLS at the deployment reverse proxy using an operator-managed
    certificate and enable HSTS.
-4. Run `./deploy/preflight.sh cpu` or `gpu`. CPU preflight fails closed when the
-   pinned model artifact is absent or its checksum has changed.
+4. Run `./deploy/preflight.sh cpu` or `gpu`. Preflight fails closed when
+   either retrieval bundle is absent or fails checksum verification; CPU also
+   verifies the pinned llama.cpp artifact. The TEI CPU workers require AMD64.
 5. Run `docker compose --profile <tier> up -d --build`.
 6. Confirm `/api/health/live` and `/api/health/ready` through the TLS endpoint.
-7. Review container health, resource ceilings, and processing network isolation.
+7. Confirm `embedding-service`, `embedding-engine`, and `reranker-engine`
+   are healthy with `docker compose ps`.
+8. Review container health, resource ceilings, and processing network isolation.
 
 Never place PHI or secrets in command history, tickets, screenshots, or support
 bundles.

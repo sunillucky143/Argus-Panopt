@@ -45,5 +45,19 @@ elif [ "$probe_model" = true ]; then
     esac
   fi
 fi
+if [ "$probe_model" = true ]; then
+  if docker compose --profile cpu run --rm --no-deps --entrypoint curl embedding-engine \
+    --silent --output /dev/null --connect-timeout 3 --max-time 3 \
+    https://1.1.1.1/; then
+    printf 'ERROR: retrieval processing network unexpectedly allowed outbound access\n' >&2
+    exit 1
+  else
+    probe_status=$?
+    case "$probe_status" in
+      7|28) ;;
+      *) printf 'ERROR: retrieval image egress probe failed with status %s\n' "$probe_status" >&2; exit 1 ;;
+    esac
+  fi
+fi
 
 printf 'Running processing containers could not reach the public internet.\n'
